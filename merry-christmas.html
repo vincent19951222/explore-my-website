@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>李面条的动物园 - Merry Christmas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Zcool+KuaiLe&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1025;
+            --text-color: #fff;
+            --accent-color: #ffcc00;
+            --border-color: #ffffff;
+            --dialogue-bg: rgba(0, 0, 0, 0.85);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Press Start 2P', 'Zcool KuaiLe', cursive; /* 像素字体 */
+            user-select: none;
+            cursor: crosshair;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, #0f0518 0%, #2a1b3d 100%);
+        }
+
+        canvas {
+            image-rendering: pixelated; /* 关键：保持像素清晰 */
+            transform: scale(1);
+            transition: transform 0.1s ease-out;
+        }
+
+        /* === RPG UI Overlay System === */
+        #rpg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 默认不阻挡点击，只有显示时才阻挡 */
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* 对话框在底部 */
+        }
+
+        #rpg-layer.active {
+            opacity: 1;
+            pointer-events: auto;
+            background: rgba(20, 10, 30, 0.4); /* 可爱的遮罩背景 */
+            backdrop-filter: blur(2px); /* 轻微模糊背景 */
+        }
+
+        /* 左侧资料卡 */
+        .profile-card {
+            position: absolute;
+            top: 20%;
+            left: 5%;
+            width: 240px;
+            background: var(--dialogue-bg);
+            border: 4px solid var(--border-color);
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.5);
+            padding: 20px;
+            color: #fff;
+            font-family: 'Zcool KuaiLe', cursive;
+            transform: translateX(-50px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #rpg-layer.active .profile-card {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .profile-title {
+            font-size: 24px;
+            color: var(--accent-color);
+            margin-bottom: 15px;
+            border-bottom: 2px dashed #666;
+            padding-bottom: 10px;
+        }
+
+        .profile-info p {
+            margin: 10px 0;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        /* 底部对话框容器 */
+        .dialogue-container {
+            width: 90%;
+            max-width: 800px;
+            margin: 0 auto 40px auto;
+            display: flex;
+            align-items: flex-end;
+            gap: 20px;
+            transform: translateY(50px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #rpg-layer.active .dialogue-container {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* 头像框 */
+        .avatar-box {
+            width: 140px;
+            height: 140px;
+            background: #2a1b3d;
+            border: 4px solid var(--border-color);
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            flex-shrink: 0;
+        }
+        
+        .avatar-box canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 对话文字框 */
+        .text-box {
+            flex-grow: 1;
+            background: var(--dialogue-bg);
+            border: 4px solid var(--border-color);
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.5);
+            padding: 25px;
+            height: 100px; /* 固定高度 */
+            position: relative;
+            cursor: pointer; /* 提示可以点击关闭 */
+        }
+
+        .text-box::after {
+            content: '▼';
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            color: var(--accent-color);
+            animation: blink 1s infinite;
+        }
+
+        .speaker-name {
+            position: absolute;
+            top: -20px;
+            left: 20px;
+            background: var(--accent-color);
+            color: #000;
+            padding: 5px 15px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            border: 2px solid #fff;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.3);
+        }
+
+        .message-content {
+            font-family: 'Zcool KuaiLe', cursive;
+            font-size: 20px;
+            line-height: 1.6;
+            color: #fff;
+        }
+
+        /* 关闭提示 */
+        .close-hint {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            font-family: sans-serif;
+            pointer-events: none;
+        }
+
+        /* Start Screen */
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+        .pixel-btn {
+            background: #ff0044;
+            color: white;
+            border: 4px solid white;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.5);
+            margin-top: 20px;
+            transition: transform 0.1s;
+        }
+
+        .pixel-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.5);
+        }
+        
+        /* 音乐开关 */
+        #music-toggle {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: white;
+            z-index: 50;
+            pointer-events: auto;
+            opacity: 0.7;
+        }
+        #music-toggle:hover { opacity: 1; }
+
+    </style>
+</head>
+<body>
+
+<div id="canvas-container">
+    <canvas id="pixelCanvas"></canvas>
+</div>
+
+<!-- RPG UI Layer -->
+<div id="rpg-layer">
+    <div class="close-hint">点击任意处关闭 | CLICK ANYWHERE TO CLOSE</div>
+
+    <!-- 左侧资料卡 -->
+    <div class="profile-card">
+        <div class="profile-title" id="profile-title">NAME</div>
+        <div class="profile-info" id="profile-content">
+            <!-- JS 填充 -->
+        </div>
+    </div>
+
+    <!-- 底部对话区域 -->
+    <div class="dialogue-container">
+        <!-- 头像 -->
+        <div class="avatar-box">
+            <canvas id="avatarCanvas" width="120" height="120"></canvas>
+        </div>
+        <!-- 文字 -->
+        <div class="text-box" id="dialogue-box-trigger">
+            <div class="speaker-name" id="speaker-name">Name</div>
+            <div class="message-content" id="message-content"></div>
+        </div>
+    </div>
+</div>
+
+<div id="music-toggle">🔊</div>
+
+<div id="start-overlay">
+    <h1 style="color: #ffcc00; text-shadow: 4px 4px #ff0044; text-align: center; line-height: 1.5;">李面条的动物园<br>CHRISTMAS</h1>
+    <p class="blink">CLICK TO ENTER THE ZOO</p>
+    <button class="pixel-btn" id="start-btn">START</button>
+</div>
+
+<script>
+/**
+ * 李面条的动物园 - 像素引擎 v3.0 (RPG Update)
+ */
+
+const canvas = document.getElementById('pixelCanvas');
+const ctx = canvas.getContext('2d');
+const startOverlay = document.getElementById('start-overlay');
+const musicToggle = document.getElementById('music-toggle');
+
+// RPG UI Elements
+const rpgLayer = document.getElementById('rpg-layer');
+const avatarCanvas = document.getElementById('avatarCanvas');
+const avatarCtx = avatarCanvas.getContext('2d');
+const speakerNameEl = document.getElementById('speaker-name');
+const messageContentEl = document.getElementById('message-content');
+const profileTitleEl = document.getElementById('profile-title');
+const profileContentEl = document.getElementById('profile-content');
+const dialogueBoxTrigger = document.getElementById('dialogue-box-trigger');
+
+// 配置
+const SCALE = 3; // 主场景缩放
+let WIDTH, HEIGHT;
+let frame = 0;
+
+// 交互状态
+const mouse = { x: 0, y: 0 };
+const tilt = { x: 0, y: 0 };
+let activeCharacter = null;
+let isPlaying = false;
+let isDialogueOpen = false;
+
+// 调色板
+const PALETTE = {
+    snow: '#e2f3f5',
+    snowShadow: '#b8d8e0',
+    ground: '#2d1b4e',
+    groundDark: '#1a1025',
+    houseBody: '#b85e44',
+    houseBodyDark: '#8a4231',
+    roof: '#3e8948',
+    roofLight: '#5fb86b',
+    gold: '#ffcc00',
+    red: '#ff0044',
+    white: '#ffffff',
+    
+    // 角色特有颜色
+    miantiaoBase: '#8d6e63', // 棕色
+    miantiaoStripe: '#4e342e', // 深棕条纹
+    doubaoBase: '#e0e0e0', // 银渐层白
+    doubaoGrey: '#9e9e9e', // 银渐层灰
+    huajuanBase: '#fff8e1', // 奶油白
+    huajuanPoint: '#5d4037', // 重点色
+    wotouBase: '#fb8c00', // 柯基橘
+    wotouWhite: '#ffffff', // 柯基白
+    eyes: '#000000',
+    nose: '#ff8a80'
+};
+
+// ==========================================
+// 1. 像素精灵数据 (Pixel Art Data)
+// ==========================================
+const SPRITE_MAPS = {
+    miantiao: [
+        "   2222     ",
+        "  222222 4  ",
+        "  444444    ",
+        "  121212    ",
+        " 11311311   ",
+        " 11144111   ",
+        "  121211    ",
+        " 1222211    ",
+        " 1121211 2  ",
+        " 1111111 2  ",
+        "  11  11    ",
+        "            "
+    ],
+    doubao: [
+        "            ",
+        "  2    2    ",
+        " 21222212   ",
+        " 21111112   ",
+        " 11311311   ",
+        " 11144111   ",
+        " 21111112   ",
+        " 21111112   ",
+        " 11111111   ",
+        "  11  11    ",
+        "            ",
+        "            "
+    ],
+    huajuan: [
+        "            ",
+        "  2    2    ",
+        " 11111111   ",
+        " 11111111   ",
+        " 11311311   ",
+        " 11244211   ",
+        "  111111    ",
+        " 11111111   ",
+        " 11111111 2 ",
+        " 11111111 2 ",
+        "  11  11  2 ",
+        "            "
+    ],
+    wotou: [
+        " 1      1   ",
+        " 11    11   ",
+        " 11111111   ",
+        " 14411441   ",
+        " 13411431   ",
+        " 14444441   ",
+        "  444444    ",
+        " 11111111   ",
+        " 11111111   ",
+        " 1 1  1 1   ",
+        "            ",
+        "            "
+    ]
+};
+
+// 角色资料数据
+const PROFILES = {
+    miantiao: {
+        title: "李面条 (大哥)",
+        desc: "<p>品种：澳洲短毛猫</p><p>性格：傲娇、严肃、其实很粘人</p><p>爱好：占据最高点、把人类当枕头</p><p>圣诞愿望：希望全世界的猫罐头都自动打开。</p>"
+    },
+    doubao: {
+        title: "田豆包",
+        desc: "<p>品种：银渐层</p><p>性格：呆萌、Q弹、只会喵喵叫</p><p>爱好：像皮球一样弹跳</p><p>圣诞愿望：变成一颗真正的圣诞树装饰球。</p>"
+    },
+    huajuan: {
+        title: "李花卷 (颜值担当)",
+        desc: "<p>品种：布偶猫</p><p>性格：优雅、温柔、自带柔光滤镜</p><p>爱好：静静地看着大家疯</p><p>圣诞愿望：保持毛发柔顺，发光一整晚。</p>"
+    },
+    wotou: {
+        title: "田窝头",
+        desc: "<p>品种：柯基</p><p>性格：人来疯、永动机</p><p>爱好：疯狂跑圈、秀屁股</p><p>圣诞愿望：跑得比圣诞老人的驯鹿还快！</p>"
+    }
+};
+
+// ==========================================
+// 2. 渲染引擎
+// ==========================================
+
+function resize() {
+    WIDTH = window.innerWidth;
+    HEIGHT = window.innerHeight;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    ctx.imageSmoothingEnabled = false;
+}
+
+function toIso(x, y, z) {
+    let isoX = (x - y) * 16;
+    let isoY = (x + y) * 8 - (z * 16);
+    isoX += WIDTH / 2;
+    isoY += HEIGHT / 2 + 100;
+    isoX += tilt.x * (z * 0.5 + 10); 
+    isoY += tilt.y * (z * 0.5 + 10);
+    return { x: isoX, y: isoY };
+}
+
+function drawCube(x, y, z, w, h, d, colors) {
+    const p = [
+        toIso(x, y, z), toIso(x + w, y, z), toIso(x + w, y + h, z), toIso(x, y + h, z),
+        toIso(x, y, z + d), toIso(x + w, y, z + d), toIso(x + w, y + h, z + d), toIso(x, y + h, z + d)
+    ];
+
+    ctx.lineWidth = 1; ctx.lineJoin = 'round';
+    ctx.fillStyle = colors.top; ctx.beginPath();
+    ctx.moveTo(p[4].x, p[4].y); ctx.lineTo(p[5].x, p[5].y); ctx.lineTo(p[6].x, p[6].y); ctx.lineTo(p[7].x, p[7].y); ctx.fill();
+    ctx.fillStyle = colors.right; ctx.beginPath();
+    ctx.moveTo(p[5].x, p[5].y); ctx.lineTo(p[1].x, p[1].y); ctx.lineTo(p[2].x, p[2].y); ctx.lineTo(p[6].x, p[6].y); ctx.fill();
+    ctx.fillStyle = colors.left; ctx.beginPath();
+    ctx.moveTo(p[4].x, p[4].y); ctx.lineTo(p[7].x, p[7].y); ctx.lineTo(p[3].x, p[3].y); ctx.lineTo(p[0].x, p[0].y); ctx.fill();
+}
+
+// 绘制等轴测精灵
+function drawPixelSprite(x, y, z, spriteMap, colors, scale = 1, flip = false) {
+    const origin = toIso(x, y, z);
+    const pixelSize = 2 * SCALE * scale;
+    const offsetX = origin.x - (12 * pixelSize) / 2;
+    const offsetY = origin.y - (12 * pixelSize);
+
+    for (let r = 0; r < 12; r++) {
+        for (let c = 0; c < 12; c++) {
+            let charCode = spriteMap[r][flip ? 11 - c : c];
+            if (charCode !== ' ') {
+                let color = null;
+                if (charCode === '1') color = colors.base;
+                if (charCode === '2') color = colors.secondary;
+                if (charCode === '3') color = colors.eyes || PALETTE.eyes;
+                if (charCode === '4') color = colors.detail || PALETTE.white;
+                if (color) {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(offsetX + c * pixelSize, offsetY + r * pixelSize, pixelSize, pixelSize);
+                }
+            }
+        }
+    }
+}
+
+// 绘制平面高清头像 (用于UI)
+function drawFlatPortrait(canvasContext, mapKey, colors) {
+    const map = SPRITE_MAPS[mapKey];
+    const w = canvasContext.canvas.width;
+    const h = canvasContext.canvas.height;
+    const pixelSize = w / 12; // 填满画布
+    
+    canvasContext.clearRect(0, 0, w, h);
+    
+    for (let r = 0; r < 12; r++) {
+        for (let c = 0; c < 12; c++) {
+            let charCode = map[r][c];
+            if (charCode !== ' ') {
+                let color = null;
+                if (charCode === '1') color = colors.base;
+                if (charCode === '2') color = colors.secondary;
+                if (charCode === '3') color = colors.eyes || PALETTE.eyes;
+                if (charCode === '4') color = colors.detail || PALETTE.white;
+                
+                if (color) {
+                    canvasContext.fillStyle = color;
+                    canvasContext.fillRect(c * pixelSize, r * pixelSize, pixelSize + 0.5, pixelSize + 0.5);
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 3. 游戏对象
+// ==========================================
+
+class GameObject {
+    constructor(x, y, z) {
+        this.x = x; this.y = y; this.z = z; this.baseZ = z; this.depth = 0;
+    }
+    update() { this.depth = this.x + this.y + (this.z * 1.5); }
+    render() {}
+    checkHit(mx, my) {
+        const pos = toIso(this.x, this.y, this.z);
+        return Math.hypot(pos.x - mx, pos.y - 40 - my) < 50; 
+    }
+}
+
+class Island extends GameObject {
+    render() {
+        drawCube(this.x - 10, this.y - 10, this.z - 2, 20, 20, 2, { top: PALETTE.snow, right: PALETTE.snowShadow, left: PALETTE.snowShadow });
+        drawCube(this.x - 10, this.y - 10, this.z - 6, 20, 20, 4, { top: PALETTE.ground, right: PALETTE.groundDark, left: PALETTE.groundDark });
+    }
+}
+
+class House extends GameObject {
+    render() {
+        // House Body
+        drawCube(this.x, this.y, this.z, 8, 6, 6, { top: '#7a3e2e', right: PALETTE.houseBodyDark, left: PALETTE.houseBody });
+        // Roof
+        drawCube(this.x - 0.5, this.y - 0.5, this.z + 6, 9, 7, 1.5, { top: PALETTE.snow, right: PALETTE.snowShadow, left: PALETTE.snowShadow });
+        // Chimney
+        drawCube(this.x + 1, this.y + 1, this.z + 7.5, 1.5, 1.5, 3, { top: '#333', right: '#444', left: '#222' });
+        
+        // Neon Sign - 移动更高 (y - 90 替代之前的 y - 50)
+        const roofPos = toIso(this.x + 4, this.y + 6, this.z + 10);
+        ctx.save();
+        ctx.textAlign = 'center';
+        const alpha = 0.7 + Math.sin(frame * 0.1) * 0.3;
+        ctx.font = `bold ${10 * SCALE}px 'Press Start 2P'`;
+        ctx.fillStyle = `rgba(255, 204, 0, ${alpha})`;
+        ctx.shadowColor = PALETTE.gold; ctx.shadowBlur = 20;
+        // 修改1: 提高标题位置
+        ctx.fillText("李面条的动物园", roofPos.x, roofPos.y - 90); 
+        ctx.font = `${6 * SCALE}px 'Press Start 2P'`;
+        ctx.fillStyle = `rgba(255, 50, 50, 1)`;
+        ctx.shadowColor = PALETTE.red;
+        ctx.fillText("MERRY CHRISTMAS!", roofPos.x, roofPos.y - 60);
+        ctx.restore();
+    }
+}
+
+class Tree extends GameObject {
+    render() {
+        drawCube(this.x, this.y, this.z, 1, 1, 2, { top:'#5d4037', right:'#3e2723', left:'#4e342e' });
+        for(let i=0; i<3; i++) {
+            let w = 4 - i;
+            drawCube(this.x - w/2 + 0.5, this.y - w/2 + 0.5, this.z + 2 + i*1.5, w, w, 1.5, { top: PALETTE.roofLight, right: PALETTE.roof, left: PALETTE.roof });
+            if (frame % 30 < 15) drawSprite(this.x + w/2, this.y - w/2, this.z + 2 + i*1.5 + 1, 0.5, PALETTE.red, 'circle');
+            else drawSprite(this.x - w/2, this.y + w/2, this.z + 2 + i*1.5 + 1, 0.5, PALETTE.gold, 'circle');
+        }
+        const topPos = toIso(this.x+0.5, this.y+0.5, this.z + 7);
+        ctx.fillStyle = PALETTE.gold; ctx.beginPath(); ctx.arc(topPos.x, topPos.y, 4 * SCALE, 0, Math.PI*2); ctx.fill();
+    }
+}
+
+class Character extends GameObject {
+    constructor(id, x, y, z, name, message, colors, mapKey) {
+        super(x, y, z);
+        this.id = id; this.name = name; this.message = message;
+        this.colors = colors; this.mapKey = mapKey;
+        this.isHovered = false; this.flip = false;
+    }
+    renderLabel() {
+        if (this.isHovered && !isDialogueOpen) {
+            const pos = toIso(this.x, this.y, this.z + 4);
+            ctx.fillStyle = 'white'; ctx.font = '12px sans-serif'; ctx.fillText("▼", pos.x - 6, pos.y);
+        }
+    }
+    render() {
+        drawPixelSprite(this.x, this.y, this.z, SPRITE_MAPS[this.mapKey], this.colors, 1, this.flip);
+        this.renderLabel();
+    }
+}
+
+class Wotou extends Character {
+    constructor(id, x, y, z, name, message, colors, mapKey, cx, cy) {
+        super(id, x, y, z, name, message, colors, mapKey);
+        this.cx = cx; this.cy = cy; this.angle = 0; this.trail = [];
+    }
+    update() {
+        if (!isDialogueOpen) { // 对话时暂停跑圈，不然很难点击
+            this.angle += 0.08;
+            this.x = this.cx + Math.cos(this.angle) * 4;
+            this.y = this.cy + Math.sin(this.angle) * 4;
+            this.z = this.baseZ + Math.abs(Math.sin(this.angle * 4)) * 0.5;
+            this.flip = Math.cos(this.angle + Math.PI/2) > 0;
+            if (frame % 3 === 0) {
+                this.trail.push({x: this.x, y: this.y, z: this.z, alpha: 0.8, flip: this.flip});
+                if (this.trail.length > 4) this.trail.shift();
+            }
+        }
+        super.update();
+    }
+    render() {
+        this.trail.forEach(t => {
+            ctx.globalAlpha = t.alpha; t.alpha -= 0.1;
+            drawPixelSprite(t.x, t.y, t.z, SPRITE_MAPS[this.mapKey], this.colors, 1, t.flip);
+        });
+        ctx.globalAlpha = 1;
+        super.render();
+    }
+}
+
+function drawSprite(x, y, z, size, color, type = 'circle') {
+    const pos = toIso(x, y, z);
+    ctx.fillStyle = color;
+    if (type === 'circle') { ctx.beginPath(); ctx.arc(pos.x, pos.y, size * SCALE, 0, Math.PI * 2); ctx.fill(); }
+}
+
+// ==========================================
+// 4. 音频系统
+// ==========================================
+const AudioSys = {
+    ctx: null, isPlaying: false, timer: null, muted: false,
+    init: function() { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    playNote: function(freq, type, duration, time) {
+        if(this.muted) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0.05, time); gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(time); osc.stop(time + duration);
+    },
+    playJingleLoop: function() {
+        if (!this.isPlaying) return;
+        const now = this.ctx.currentTime;
+        const melody = [
+            {n:659,d:0.2,t:0},{n:659,d:0.2,t:0.25},{n:659,d:0.4,t:0.5},{n:659,d:0.2,t:1.0},{n:659,d:0.2,t:1.25},{n:659,d:0.4,t:1.5},
+            {n:659,d:0.2,t:2.0},{n:783,d:0.2,t:2.25},{n:523,d:0.3,t:2.5},{n:587,d:0.1,t:2.8},{n:659,d:0.8,t:3.0},
+            {n:698,d:0.2,t:4.0},{n:698,d:0.2,t:4.25},{n:698,d:0.3,t:4.5},{n:698,d:0.1,t:4.8},{n:698,d:0.2,t:5.0},{n:659,d:0.2,t:5.25},
+            {n:659,d:0.2,t:5.5},{n:659,d:0.1,t:5.75},{n:659,d:0.1,t:5.85},{n:659,d:0.2,t:6.0},{n:587,d:0.2,t:6.25},{n:587,d:0.2,t:6.5},
+            {n:659,d:0.2,t:6.75},{n:587,d:0.4,t:7.0},{n:783,d:0.4,t:7.5}
+        ];
+        melody.forEach(m => this.playNote(m.n, 'triangle', m.d, now + m.t));
+        this.timer = setTimeout(() => this.playJingleLoop(), 8000);
+    },
+    start: function() {
+        if (!this.ctx) this.init(); if (this.ctx.state === 'suspended') this.ctx.resume();
+        this.isPlaying = true; this.muted = false; this.playJingleLoop(); musicToggle.innerText = "🔊";
+    },
+    toggle: function() { this.muted = !this.muted; musicToggle.innerText = this.muted ? "🔇" : "🔊"; },
+    playClick: function() { if(this.ctx && !this.muted) this.playNote(880, 'sine', 0.1, this.ctx.currentTime); },
+    playType: function() { if(this.ctx && !this.muted) this.playNote(1200 + Math.random()*500, 'square', 0.05, this.ctx.currentTime); }
+};
+
+// ==========================================
+// 5. 交互逻辑 (RPG UI)
+// ==========================================
+
+function openDialogue(character) {
+    if (isDialogueOpen) return;
+    isDialogueOpen = true;
+    
+    // 1. 播放声音
+    AudioSys.playClick();
+    
+    // 2. 绘制高清头像
+    drawFlatPortrait(avatarCtx, character.mapKey, character.colors);
+    
+    // 3. 设置名字和资料
+    speakerNameEl.innerText = character.name;
+    const profile = PROFILES[character.mapKey];
+    profileTitleEl.innerText = profile.title;
+    profileContentEl.innerHTML = profile.desc;
+    
+    // 4. 显示UI层
+    rpgLayer.classList.add('active');
+    
+    // 5. 打字机效果
+    messageContentEl.innerHTML = '';
+    let i = 0;
+    const text = character.message;
+    
+    function type() {
+        if (!isDialogueOpen) return;
+        if (i < text.length) {
+            messageContentEl.innerHTML += text.charAt(i);
+            i++;
+            if (i % 3 === 0) AudioSys.playType(); // 打字音效
+            setTimeout(type, 30);
+        }
+    }
+    type();
+}
+
+function closeDialogue() {
+    isDialogueOpen = false;
+    rpgLayer.classList.remove('active');
+}
+
+// ==========================================
+// 6. 初始化与循环
+// ==========================================
+let particles = [];
+let snowFlakes = [];
+
+class Particle {
+    constructor(x, y, z, type, text) {
+        this.x = x; this.y = y; this.z = z; this.type = type; this.life = 1.0; this.text = text;
+        this.vx = (Math.random()-0.5)*0.1; this.vy = (Math.random()-0.5)*0.1; this.vz = 0.05+Math.random()*0.05;
+    }
+    update() { this.x+=this.vx; this.y+=this.vy; this.z+=this.vz; this.life-=0.015; }
+    render() {
+        const p = toIso(this.x, this.y, this.z);
+        if(this.type==='heart') { ctx.fillStyle=`rgba(255,0,68,${this.life})`; ctx.font=`${10*SCALE}px sans-serif`; ctx.fillText("♥",p.x,p.y); }
+        else if(this.type==='smoke') { ctx.fillStyle=`rgba(200,200,200,${this.life*0.5})`; ctx.fillRect(p.x,p.y,(1-this.life)*10*SCALE,(1-this.life)*5*SCALE); }
+        else if(this.type==='sparkle') { ctx.fillStyle=`rgba(255,255,200,${this.life})`; ctx.fillRect(p.x,p.y,2*SCALE,2*SCALE); }
+    }
+}
+
+function initWorld() {
+    objects.push(new Island(0, 0, 0));
+    objects.push(new House(-2, -2, 2));
+    objects.push(new Tree(5, 5, 2));
+
+    const c1 = new Character('miantiao', 2, 1, 9, "李面条", "（严肃脸）圣诞快乐……睡觉时间到了，把你的腿借我当枕头。", 
+        { base: PALETTE.miantiaoBase, secondary: PALETTE.miantiaoStripe, eyes: PALETTE.eyes, detail: PALETTE.red }, 'miantiao');
+    
+    const c2 = new Character('doubao', 3, -6, 2, "田豆包", "（弹跳）喵！喵！圣诞快乐！我看起来像不像一个银色的铃铛？", 
+        { base: PALETTE.doubaoBase, secondary: PALETTE.doubaoGrey, eyes: PALETTE.eyes, detail: PALETTE.nose }, 'doubao');
+    
+    const c3 = new Character('huajuan', 5, 5, 2, "李花卷", "（优雅地眨眼）圣诞快乐。希望今晚的月光和你一样温柔。", 
+        { base: PALETTE.huajuanBase, secondary: PALETTE.huajuanPoint, eyes: '#42a5f5', detail: PALETTE.huajuanBase }, 'huajuan');
+    
+    const c4 = new Wotou('wotou', 5, 7, 2, "田窝头", "（疯狂转圈）圣诞快乐！！花卷姐姐等等我！我有大耳朵！我还有桃心屁股！", 
+        { base: PALETTE.wotouBase, secondary: PALETTE.wotouWhite, eyes: PALETTE.eyes, detail: PALETTE.wotouWhite }, 'wotou', 5, 5);
+
+    characters.push(c1, c2, c3, c4);
+    objects.push(c1, c2, c3, c4);
+}
+
+const objects = [];
+const characters = [];
+
+function animate() {
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    
+    // Background
+    ctx.fillStyle = PALETTE.white;
+    for(let i=0; i<30; i++) {
+        const sx = (Math.sin(i*132+frame*0.001)*0.5+0.5)*WIDTH;
+        const sy = (Math.cos(i*45+frame*0.001)*0.5+0.5)*HEIGHT;
+        if(Math.random()>0.95) ctx.fillRect(sx, sy, 2, 2);
+    }
+
+    objects.forEach(o => {
+        if(o.update) o.update();
+        if(o.id === 'doubao' && !isDialogueOpen) o.z = o.baseZ + Math.abs(Math.sin(frame*0.1))*1.5;
+        if(o.id === 'miantiao') o.z = o.baseZ + Math.sin(frame*0.05)*0.1;
+    });
+    
+    objects.sort((a, b) => a.depth - b.depth);
+    objects.forEach(o => o.render());
+
+    // Particles
+    if (frame % 20 === 0) particles.push(new Particle(-1, -1, 10.5, 'smoke'));
+    if (frame % 5 === 0) { 
+        const h = characters.find(c=>c.id==='huajuan');
+        if(h) particles.push(new Particle(h.x+(Math.random()-0.5), h.y+(Math.random()-0.5), h.z+Math.random()*2, 'sparkle'));
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(); particles[i].render();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    // Snow
+    if (Math.random() > 0.8) snowFlakes.push({x: Math.random()*WIDTH, y: -10, size: Math.random()*3+1, speed: Math.random()*1+0.5});
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let i = snowFlakes.length - 1; i >= 0; i--) {
+        let s = snowFlakes[i]; s.y += s.speed; s.x += Math.sin(frame*0.01 + s.y*0.01)*0.5;
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+        if (s.y > HEIGHT) snowFlakes.splice(i, 1);
+    }
+
+    checkHover();
+    frame++;
+    if (isPlaying) requestAnimationFrame(animate);
+}
+
+function checkHover() {
+    if (isDialogueOpen) {
+        canvas.style.cursor = 'default';
+        return null;
+    }
+    let hovered = null;
+    characters.forEach(c => {
+        c.isHovered = false;
+        if (c.checkHit(mouse.x, mouse.y)) { hovered = c; c.isHovered = true; }
+    });
+    canvas.style.cursor = hovered ? 'pointer' : 'crosshair';
+    return hovered;
+}
+
+window.addEventListener('resize', resize);
+window.addEventListener('mousemove', (e) => {
+    mouse.x = e.clientX; mouse.y = e.clientY;
+    tilt.x = (e.clientX / WIDTH - 0.5) * 2; tilt.y = (e.clientY / HEIGHT - 0.5) * 2;
+});
+
+// Click Handling
+window.addEventListener('click', (e) => {
+    // 如果点击了关闭区域 (overlay)
+    if (isDialogueOpen) {
+        // 如果点击的是对话框本体，不关闭（防止误触）
+        // 但这里为了简化逻辑，点击任意处关闭，除了点击资料卡或头像
+        // 实际体验中，点击遮罩层关闭是最舒服的
+        closeDialogue();
+        return;
+    }
+
+    const target = checkHover();
+    if (target) {
+        openDialogue(target);
+        particles.push(new Particle(target.x, target.y, target.z + 5, 'heart'));
+    }
+});
+
+dialogueBoxTrigger.addEventListener('click', (e) => {
+    e.stopPropagation(); // 防止冒泡立即触发window click关闭
+    closeDialogue();
+});
+
+musicToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    AudioSys.toggle();
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    isPlaying = true;
+    resize();
+    initWorld();
+    AudioSys.start();
+    animate();
+});
+
+resize();
+</script>
+</body>
+</html>

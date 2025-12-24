@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>李面条的动物园 - Merry Christmas!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', 'Courier New', monospace;
+            overflow: hidden;
+            background: linear-gradient(180deg, #0a0a1a 0%, #1a1a3a 50%, #2a1a4a 100%);
+            cursor: crosshair;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        /* 标题容器 - 像素霓虹效果 */
+        .title-container {
+            position: fixed;
+            top: 3%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .main-title {
+            font-size: clamp(16px, 4vw, 36px);
+            color: #ffd700;
+            text-shadow:
+                3px 3px 0 #ff0000,
+                -2px -2px 0 #00ff00,
+                0 0 10px #ffd700,
+                0 0 20px #ff0000,
+                0 0 30px #00ff00;
+            animation: titleGlow 2s ease-in-out infinite alternate;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+            image-rendering: pixelated;
+        }
+
+        .subtitle {
+            font-size: clamp(10px, 2vw, 18px);
+            color: #00ff00;
+            text-shadow:
+                2px 2px 0 #ff0000,
+                0 0 10px #00ff00,
+                0 0 15px #ffd700;
+            animation: subtitleBlink 1s ease-in-out infinite alternate;
+            letter-spacing: 2px;
+            image-rendering: pixelated;
+        }
+
+        @keyframes titleGlow {
+            0% {
+                text-shadow:
+                    3px 3px 0 #ff0000,
+                    -2px -2px 0 #00ff00,
+                    0 0 10px #ffd700,
+                    0 0 20px #ff0000;
+            }
+            100% {
+                text-shadow:
+                    3px 3px 0 #ff0000,
+                    -2px -2px 0 #00ff00,
+                    0 0 20px #ffd700,
+                    0 0 40px #ff0000,
+                    0 0 60px #00ff00;
+            }
+        }
+
+        @keyframes subtitleBlink {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* RPG 风格对话框系统 */
+        .rpg-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            image-rendering: pixelated;
+        }
+
+        .rpg-overlay.show {
+            display: flex;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 左侧角色信息卡片 */
+        .character-info-card {
+            position: fixed;
+            left: 3%;
+            top: 50%;
+            transform: translateY(-50%) scale(0);
+            width: 280px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 4px solid #ffd700;
+            padding: 20px;
+            z-index: 2002;
+            image-rendering: pixelated;
+            box-shadow:
+                0 0 0 4px #000,
+                0 0 30px rgba(255, 215, 0, 0.4),
+                inset 0 0 30px rgba(255, 215, 0, 0.1);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .character-info-card.show {
+            transform: translateY(-50%) scale(1);
+        }
+
+        .character-info-card::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            background: linear-gradient(45deg, #ff6b6b, #ffd700, #4ecdc4, #ff6b6b);
+            background-size: 300% 300%;
+            z-index: -1;
+            animation: cardBorderGlow 4s ease infinite;
+        }
+
+        @keyframes cardBorderGlow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .info-card-title {
+            font-size: 14px;
+            color: #ffd700;
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 0 #ff0000;
+            border-bottom: 2px dashed #ffd700;
+            padding-bottom: 10px;
+        }
+
+        .info-card-stats {
+            margin-top: 15px;
+        }
+
+        .info-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 9px;
+        }
+
+        .info-stat-label {
+            color: #4ecdc4;
+            text-transform: uppercase;
+        }
+
+        .info-stat-value {
+            color: #fff;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        .stat-bar {
+            width: 100%;
+            height: 8px;
+            background: #0a0a1a;
+            border: 2px solid #333;
+            margin-top: 4px;
+            position: relative;
+        }
+
+        .stat-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b);
+            transition: width 1s ease-out;
+        }
+
+        /* 主对话框容器 */
+        .rpg-dialog-container {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            width: 90%;
+            max-width: 900px;
+            z-index: 2001;
+            image-rendering: pixelated;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .rpg-dialog-container.show {
+            transform: translateX(-50%) scale(1);
+        }
+
+        /* 头像区域 */
+        .dialog-avatar {
+            position: absolute;
+            left: -3px;
+            bottom: -3px;
+            width: 150px;
+            height: 150px;
+            background: #000;
+            border: 4px solid #ffd700;
+            image-rendering: pixelated;
+            box-shadow:
+                4px 4px 0 #000,
+                0 0 20px rgba(255, 215, 0, 0.6);
+            z-index: 2;
+        }
+
+        .dialog-avatar canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* 对话框主体 */
+        .rpg-dialog-box {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+            border: 4px solid #ffd700;
+            margin-left: 80px;
+            padding: 25px 25px 25px 30px;
+            position: relative;
+            box-shadow:
+                0 0 0 4px #000,
+                0 0 30px rgba(255, 215, 0, 0.4),
+                inset 0 0 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .rpg-dialog-box::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            background: linear-gradient(45deg, #ff6b6b, #ffd700, #4ecdc4, #a8e6cf);
+            background-size: 300% 300%;
+            z-index: -1;
+            animation: dialogBorderGlow 4s ease infinite;
+        }
+
+        @keyframes dialogBorderGlow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        /* 对话框名称 */
+        .rpg-character-name {
+            position: absolute;
+            top: -20px;
+            left: 20px;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b);
+            color: #000;
+            padding: 8px 20px;
+            font-size: 12px;
+            font-weight: bold;
+            border: 3px solid #000;
+            box-shadow: 3px 3px 0 #000;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            image-rendering: pixelated;
+        }
+
+        /* 对话文本区域 */
+        .rpg-dialog-text {
+            color: #fff;
+            font-size: 14px;
+            line-height: 1.8;
+            text-shadow: 2px 2px 0 #000;
+            min-height: 80px;
+            white-space: pre-wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 继续提示 */
+        .dialog-continue-hint {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            color: #ffd700;
+            font-size: 10px;
+            animation: blink 1s ease-in-out infinite;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* 关闭按钮 */
+        .dialog-close-btn {
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            background: #ff6b6b;
+            color: #fff;
+            border: 3px solid #000;
+            padding: 10px 15px;
+            font-size: 10px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', monospace;
+            box-shadow: 3px 3px 0 #000;
+            transition: all 0.2s;
+            image-rendering: pixelated;
+            z-index: 3;
+        }
+
+        .dialog-close-btn:hover {
+            background: #ff8888;
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 #000;
+        }
+
+        /* 角色描述 */
+        .character-description {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px dashed #4ecdc4;
+            font-size: 9px;
+            color: #a8e6cf;
+            line-height: 1.6;
+        }
+
+        .character-description strong {
+            color: #ffd700;
+        }
+
+        /* 加载指示器 */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffd700;
+            font-size: 16px;
+            text-align: center;
+            z-index: 2000;
+            text-shadow: 2px 2px 0 #ff0000;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        /* 点击提示 */
+        .click-hint {
+            position: fixed;
+            bottom: 3%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 8px;
+            text-align: center;
+            opacity: 0.7;
+            animation: pulse 2s ease-in-out infinite;
+            pointer-events: none;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* 背景星星 */
+        .star {
+            position: fixed;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            animation: twinkle 3s ease-in-out infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* 角色名称标签 */
+        .name-tag {
+            position: fixed;
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ffd700;
+            color: #fff;
+            padding: 4px 8px;
+            font-size: 8px;
+            pointer-events: none;
+            z-index: 500;
+            white-space: nowrap;
+            image-rendering: pixelated;
+        }
+
+        /* 控制说明 */
+        .controls-hint {
+            position: fixed;
+            bottom: 6%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 6px;
+            text-align: center;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="title-container">
+        <div class="main-title">李面条的动物园</div>
+        <div class="subtitle">✨ MERRY CHRISTMAS! ✨</div>
+    </div>
+
+    <!-- RPG 风格对话框遮罩层 -->
+    <div class="rpg-overlay" id="rpg-overlay" onclick="closeRPGDialog(event)">
+        <!-- 左侧角色信息卡片 -->
+        <div class="character-info-card" id="character-info-card" onclick="event.stopPropagation()">
+            <div class="info-card-title" id="info-name">角色名称</div>
+            <div class="info-card-stats">
+                <div class="info-stat">
+                    <span class="info-stat-label">类型</span>
+                    <span class="info-stat-value" id="info-type">猫科</span>
+                </div>
+                <div class="info-stat">
+                    <span class="info-stat-label">性格</span>
+                    <span class="info-stat-value" id="info-personality">温柔</span>
+                </div>
+                <div class="info-stat">
+                    <span class="info-stat-label">可爱度</span>
+                    <span class="info-stat-value" id="info-cute">100%</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" id="cute-bar" style="width: 100%"></div>
+                </div>
+                <div class="info-stat">
+                    <span class="info-stat-label">活力值</span>
+                    <span class="info-stat-value" id="info-energy">85%</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" id="energy-bar" style="width: 85%"></div>
+                </div>
+            </div>
+            <div class="character-description" id="info-description">
+                <strong>角色介绍</strong><br>
+                这里是角色的详细介绍...
+            </div>
+        </div>
+
+        <!-- 主对话框容器 -->
+        <div class="rpg-dialog-container" id="rpg-dialog-container" onclick="event.stopPropagation()">
+            <button class="dialog-close-btn" onclick="closeRPGDialog(event)">✕ 关闭</button>
+
+            <!-- 头像区域 -->
+            <div class="dialog-avatar" id="dialog-avatar">
+                <!-- Canvas 会被 JS 动态插入 -->
+            </div>
+
+            <!-- 对话框 -->
+            <div class="rpg-dialog-box">
+                <div class="rpg-character-name" id="rpg-character-name">角色名</div>
+                <div class="rpg-dialog-text" id="rpg-dialog-text"></div>
+                <div class="dialog-continue-hint">▼ 点击继续</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="name-tag" id="name-tag"></div>
+
+    <div class="click-hint">
+        🎄 点击角色查看祝福 | 移动鼠标体验视差效果 🎄
+    </div>
+
+    <div class="controls-hint">
+        拖拽旋转视角 | 滚轮缩放
+    </div>
+
+    <div class="loading" id="loading">加载像素世界中</div>
+
+    <!-- 圣诞音乐 (8-bit Chiptune 风格) -->
+    <audio id="christmas-music" loop preload="auto">
+        <source src="https://assets.mixkit.co/music/preview/mixkit-christmas-gold-bells-573.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- 音乐控制按钮 -->
+    <button id="music-toggle" onclick="toggleMusic()" style="position: fixed; top: 20px; right: 20px; z-index: 100; background: rgba(255,215,0,0.9); border: 3px solid #000; padding: 10px 15px; font-family: 'Press Start 2P', monospace; font-size: 10px; cursor: pointer; image-rendering: pixelated; box-shadow: 3px 3px 0 #000;">
+        🎵 音乐: OFF
+    </button>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <script>
+        // ==================== 配置 ====================
+        const CONFIG = {
+            colors: {
+                sky: 0x0a0a1a,
+                snow: 0xffffff,
+                snowShadow: 0xcccccc,
+                grass: 0x2d5a27,
+                treeGreen: 0x1a4d1a,
+                treeDark: 0x0f2f0f,
+                trunkBrown: 0x4a3728,
+                gold: 0xffd700,
+                red: 0xff0000,
+                green: 0x00ff00,
+                blue: 0x0066ff,
+                white: 0xffffff,
+                black: 0x000000,
+                houseWall: 0xf5deb3,
+                houseRoof: 0x8b4513,
+                houseWindow: 0xfffacd,
+                giftRed: 0xff4444,
+                giftBlue: 0x4444ff,
+                giftGold: 0xffd700
+            },
+            characters: {
+                miantiao: {
+                    name: '李面条',
+                    type: '澳洲短毛猫',
+                    personality: '傲娇粘人',
+                    cute: 95,
+                    energy: 60,
+                    description: '<strong>李面条</strong>是一只澳洲短毛猫大哥，虽然脾气古怪像个怪老头，但内心极其粘人。每天晚上必须在主人怀里才能入睡，是实验室里最有安全感的存在。看似高冷，实则是个超级粘人的小可爱！',
+                    color: 0x666666,
+                    secondaryColor: 0x888888,
+                    position: { x: 0, y: 1, z: 8 },
+                    scale: 1.2,
+                    orbitRadius: 6,
+                    orbitSpeed: 0.3,
+                    orbitOffset: 0,
+                    message: '（极其粘人地凑近）\n\n圣诞快乐……\n晚上了，该睡觉了，\n快把怀里腾出来给我。\n\n——李面条'
+                },
+                doubao: {
+                    name: '田豆包',
+                    type: '银渐层猫咪',
+                    personality: '超级温柔',
+                    cute: 100,
+                    energy: 75,
+                    description: '<strong>田豆包</strong>是一只胖乎乎可爱的银渐层，脾气极好，随便怎么玩都不会生气。圆润的身材和温柔的性格让他成为实验室里的解压神器。从来不生气是他的超能力，被揉成团也只会喵喵叫！',
+                    color: 0xb0b0b0,
+                    secondaryColor: 0xd0d0d0,
+                    position: { x: 5, y: 1, z: 6 },
+                    scale: 1.3,
+                    orbitRadius: 7,
+                    orbitSpeed: 0.5,
+                    orbitOffset: Math.PI / 2,
+                    message: '（被人揉捏成一团）\n\n喵！喵！喵！\n圣诞快乐！\n看到你真高兴，\n快来揉我！\n\n——田豆包'
+                },
+                huajuan: {
+                    name: '李花卷',
+                    type: '布偶猫',
+                    personality: '优雅淑女',
+                    cute: 98,
+                    energy: 55,
+                    description: '<strong>李花卷</strong>是一只漂漂亮亮的布偶猫，一举一动都透露着优雅和淑女气质。脾气极好从来不哈气，但总被小狗欺负，是实验室里最温柔的姐姐。如同她的名字一样，像花卷一样美丽动人。',
+                    color: 0xd0c0d8,
+                    secondaryColor: 0xe8d8f0,
+                    position: { x: -5, y: 1, z: 6 },
+                    scale: 1.1,
+                    orbitRadius: 8,
+                    orbitSpeed: 0.25,
+                    orbitOffset: Math.PI,
+                    message: '（温柔地行礼）\n\n圣诞快乐，\n在这美好的节日里，\n祝你也被温柔以待。\n\n——李花卷'
+                },
+                wantou: {
+                    name: '田窝头',
+                    type: '柯基妹妹',
+                    personality: '活力满满',
+                    cute: 100,
+                    energy: 100,
+                    description: '<strong>田窝头</strong>是一只可可爱爱的柯基妹妹，性格完美，喜欢玩耍。小短腿大能量，是实验室里的开心果，永远充满活力和好奇心。虽然腿短但跑得飞快，每天都在用无限的热情感染着大家！',
+                    color: 0xc4a882,
+                    secondaryColor: 0xd8bc96,
+                    position: { x: 0, y: 1, z: 9 },
+                    scale: 0.9,
+                    orbitRadius: 6.5,
+                    orbitSpeed: 0.7,
+                    orbitOffset: Math.PI * 1.5,
+                    message: '（疯狂摇尾巴冲过来）\n\n嘿！来玩啊！来玩啊！\n圣诞节就是要一起疯！\n花卷姐姐我们接着跑！\n\n——田窝头'
+                }
+            }
+        };
+
+        // ==================== 全局变量 ====================
+        let scene, camera, renderer;
+        let island, characters = [], characterMeshes = [];
+        let mouseX = 0, mouseY = 0;
+        let targetRotationX = 0, targetRotationY = 0;
+        let clock = new THREE.Clock();
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let snowflakes = [];
+        let nameTag = document.getElementById('name-tag');
+
+        // ==================== 工具函数：创建像素纹理 ====================
+        function createPixelTexture(color, size = 8, pixelSize = 2) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // 将颜色转换为 RGB
+            const r = (color >> 16) & 255;
+            const g = (color >> 8) & 255;
+            const b = color & 255;
+
+            // 创建像素块图案
+            const blockSize = size / pixelSize;
+            for (let x = 0; x < pixelSize; x++) {
+                for (let y = 0; y < pixelSize; y++) {
+                    // 添加轻微的颜色变化
+                    const variation = (Math.random() - 0.5) * 20;
+                    const brightness = 0.9 + Math.random() * 0.2;
+
+                    ctx.fillStyle = `rgb(${Math.min(255, Math.max(0, r * brightness + variation))}, ${Math.min(255, Math.max(0, g * brightness + variation))}, ${Math.min(255, Math.max(0, b * brightness + variation))})`;
+                    ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        // ==================== 工具函数：创建像素盒子 ====================
+        function createPixelBox(width, height, depth, color, castShadow = true) {
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            const texture = createPixelTexture(color);
+            const material = new THREE.MeshLambertMaterial({
+                map: texture,
+                color: color
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = castShadow;
+            mesh.receiveShadow = true;
+            return mesh;
+        }
+
+        // ==================== 创建浮空岛屿 ====================
+        function createIsland() {
+            const islandGroup = new THREE.Group();
+
+            // 主平台 - 分层创建像素效果
+            const layers = [
+                { y: -3, size: 22, color: CONFIG.colors.grass, height: 2 },
+                { y: -1.5, size: 20, color: CONFIG.colors.grass, height: 1.5 },
+                { y: -0.5, size: 18, color: 0x3d6a37, height: 1 },
+                { y: 0.2, size: 16, color: CONFIG.colors.snow, height: 0.4 }
+            ];
+
+            layers.forEach(layer => {
+                const platform = createPixelBox(layer.size, layer.height, layer.size, layer.color);
+                platform.position.y = layer.y;
+                islandGroup.add(platform);
+            });
+
+            // 添加栅栏和彩灯
+            const fencePositions = [];
+            const perimeter = 7;
+            for (let i = -perimeter; i <= perimeter; i += 2) {
+                fencePositions.push({ x: i, z: perimeter });
+                fencePositions.push({ x: i, z: -perimeter });
+                fencePositions.push({ x: perimeter, z: i });
+                fencePositions.push({ x: -perimeter, z: i });
+            }
+
+            fencePositions.forEach(pos => {
+                // 栅栏柱
+                const fencePost = createPixelBox(0.6, 1.8, 0.6, CONFIG.colors.trunkBrown);
+                fencePost.position.set(pos.x, 1.1, pos.z);
+                islandGroup.add(fencePost);
+
+                // 彩灯
+                const lightColor = [CONFIG.colors.red, CONFIG.colors.green, CONFIG.colors.gold, CONFIG.colors.blue][Math.floor(Math.random() * 4)];
+                const light = new THREE.PointLight(lightColor, 0.3, 4);
+                light.position.set(pos.x, 2, pos.z);
+                islandGroup.add(light);
+
+                const lightBulb = createPixelBox(0.25, 0.25, 0.25, lightColor);
+                lightBulb.position.set(pos.x, 2, pos.z);
+                lightBulb.material = new THREE.MeshBasicMaterial({ color: lightColor });
+                islandGroup.add(lightBulb);
+
+                // 闪烁动画
+                gsap.to(lightBulb.material, {
+                    opacity: 0.3,
+                    duration: 0.3 + Math.random() * 0.7,
+                    repeat: -1,
+                    yoyo: true
+                });
+
+                gsap.to(light, {
+                    intensity: 0.1,
+                    duration: 0.3 + Math.random() * 0.7,
+                    repeat: -1,
+                    yoyo: true
+                });
+            });
+
+            return islandGroup;
+        }
+
+        // ==================== 创建房子 ====================
+        function createHouse() {
+            const houseGroup = new THREE.Group();
+
+            // 主体
+            const walls = createPixelBox(8, 6, 6, CONFIG.colors.houseWall);
+            walls.position.y = 3;
+            houseGroup.add(walls);
+
+            // 屋顶 - 分层
+            const roofLayers = [
+                { y: 6.5, sizeX: 9, sizeZ: 7 },
+                { y: 7.5, sizeX: 7, sizeZ: 5 }
+            ];
+
+            roofLayers.forEach(layer => {
+                const roof = createPixelBox(layer.sizeX, 1.5, layer.sizeZ, CONFIG.colors.houseRoof);
+                roof.position.y = layer.y;
+                houseGroup.add(roof);
+            });
+
+            // 烟囱
+            const chimney = createPixelBox(1.5, 3, 1.5, CONFIG.colors.trunkBrown);
+            chimney.position.set(2.5, 8.5, 2);
+            houseGroup.add(chimney);
+
+            // 烟囱顶部
+            const chimneyTop = createPixelBox(1.8, 0.5, 1.8, CONFIG.colors.red);
+            chimneyTop.position.set(2.5, 10, 2);
+            houseGroup.add(chimneyTop);
+
+            // 窗户
+            const windowPositions = [
+                { x: -2.5, y: 4, z: 3.1 },
+                { x: 2.5, y: 4, z: 3.1 },
+                { x: 0, y: 4, z: -3.1 }
+            ];
+
+            windowPositions.forEach(pos => {
+                const windowFrame = createPixelBox(2, 2, 0.2, CONFIG.colors.trunkBrown);
+                windowFrame.position.set(pos.x, pos.y, pos.z);
+                houseGroup.add(windowFrame);
+
+                const windowGlass = createPixelBox(1.6, 1.6, 0.1, CONFIG.colors.houseWindow);
+                windowGlass.position.set(pos.x, pos.y, pos.z + 0.15);
+                windowGlass.material = new THREE.MeshBasicMaterial({
+                    color: CONFIG.colors.gold,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                houseGroup.add(windowGlass);
+
+                // 窗户发光
+                const windowLight = new THREE.PointLight(CONFIG.colors.gold, 0.5, 5);
+                windowLight.position.set(pos.x, pos.y, pos.z + 1);
+                houseGroup.add(windowLight);
+            });
+
+            // 门
+            const door = createPixelBox(2.5, 4, 0.3, CONFIG.colors.trunkBrown);
+            door.position.set(0, 2, 3.2);
+            houseGroup.add(door);
+
+            // 门把手
+            const doorKnob = createPixelBox(0.2, 0.2, 0.2, CONFIG.colors.gold);
+            doorKnob.position.set(0.8, 2, 3.4);
+            houseGroup.add(doorKnob);
+
+            // 霓虹灯招牌底座
+            const signBase = createPixelBox(12, 0.5, 2, 0x222222);
+            signBase.position.set(0, 8.5, 0);
+            houseGroup.add(signBase);
+
+            // 发光面板
+            const signPanel = createPixelBox(11.5, 0.3, 1.5, 0x111111);
+            signPanel.position.set(0, 8.8, 0);
+            signPanel.material = new THREE.MeshBasicMaterial({ color: 0x111111 });
+            houseGroup.add(signPanel);
+
+            // 招牌灯光
+            const signLight1 = new THREE.PointLight(CONFIG.colors.gold, 1, 10);
+            signLight1.position.set(-3, 9, 2);
+            houseGroup.add(signLight1);
+
+            const signLight2 = new THREE.PointLight(CONFIG.colors.red, 0.8, 8);
+            signLight2.position.set(3, 9, 2);
+            houseGroup.add(signLight2);
+
+            // 烟雾粒子
+            for (let i = 0; i < 6; i++) {
+                const smokeSize = 0.3 + Math.random() * 0.2;
+                const smoke = new THREE.Mesh(
+                    new THREE.BoxGeometry(smokeSize, smokeSize, smokeSize),
+                    new THREE.MeshBasicMaterial({
+                        color: 0xcccccc,
+                        transparent: true,
+                        opacity: 0.4
+                    })
+                );
+                smoke.position.set(2.5, 10 + i * 0.6, 2);
+                houseGroup.add(smoke);
+
+                // 烟雾上升动画
+                gsap.to(smoke.position, {
+                    y: smoke.position.y + 4,
+                    duration: 4 + i * 0.5,
+                    repeat: -1,
+                    ease: "none"
+                });
+
+                gsap.to(smoke.material, {
+                    opacity: 0,
+                    duration: 4 + i * 0.5,
+                    repeat: -1,
+                    ease: "none"
+                });
+
+                gsap.to(smoke.scale, {
+                    x: 2,
+                    y: 2,
+                    z: 2,
+                    duration: 4 + i * 0.5,
+                    repeat: -1,
+                    ease: "none"
+                });
+            }
+
+            return houseGroup;
+        }
+
+        // ==================== 创建圣诞树 ====================
+        function createChristmasTree(x, y, z, scale = 1) {
+            const treeGroup = new THREE.Group();
+
+            // 树干
+            const trunk = createPixelBox(1 * scale, 2 * scale, 1 * scale, CONFIG.colors.trunkBrown);
+            trunk.position.y = 1 * scale;
+            treeGroup.add(trunk);
+
+            // 树冠 - 多层
+            const layerConfigs = [
+                { width: 5, height: 2, y: 2.5 },
+                { width: 4, height: 2, y: 4.5 },
+                { width: 3, height: 1.5, y: 6.5 },
+                { width: 2, height: 1.5, y: 8 }
+            ];
+
+            layerConfigs.forEach((config, index) => {
+                const layer = createPixelBox(
+                    config.width * scale,
+                    config.height * scale,
+                    config.width * scale,
+                    index % 2 === 0 ? CONFIG.colors.treeGreen : CONFIG.colors.treeDark
+                );
+                layer.position.y = config.y * scale;
+                treeGroup.add(layer);
+
+                // 添加装饰彩灯
+                const ornamentCount = 6 + index * 2;
+                for (let i = 0; i < ornamentCount; i++) {
+                    const angle = (i / ornamentCount) * Math.PI * 2;
+                    const radius = (config.width * scale * 0.35);
+                    const ox = Math.cos(angle) * radius;
+                    const oz = Math.sin(angle) * radius;
+                    const oy = config.y * scale + (Math.random() - 0.5) * config.height * scale * 0.8;
+
+                    const ornamentColor = [CONFIG.colors.red, CONFIG.colors.gold, CONFIG.colors.blue, CONFIG.colors.white][Math.floor(Math.random() * 4)];
+                    const ornament = createPixelBox(0.35 * scale, 0.35 * scale, 0.35 * scale, ornamentColor, false);
+                    ornament.position.set(ox, oy, oz);
+                    ornament.material = new THREE.MeshBasicMaterial({ color: ornamentColor });
+                    treeGroup.add(ornament);
+
+                    // 闪烁动画
+                    gsap.to(ornament.material, {
+                        opacity: 0.3,
+                        duration: 0.2 + Math.random() * 0.6,
+                        repeat: -1,
+                        yoyo: true,
+                        delay: Math.random() * 2
+                    });
+
+                    // 添加点光源
+                    const ornamentLight = new THREE.PointLight(ornamentColor, 0.3, 2);
+                    ornamentLight.position.set(ox, oy, oz);
+                    treeGroup.add(ornamentLight);
+                }
+            });
+
+            // 树顶星星
+            const starSize = 0.8 * scale;
+            const star = new THREE.Mesh(
+                new THREE.BoxGeometry(starSize, starSize, starSize),
+                new THREE.MeshBasicMaterial({ color: CONFIG.colors.gold })
+            );
+            star.position.y = 9.5 * scale;
+            treeGroup.add(star);
+
+            // 星星发光
+            const starLight = new THREE.PointLight(CONFIG.colors.gold, 1.5, 6);
+            starLight.position.y = 9.5 * scale;
+            treeGroup.add(starLight);
+
+            // 星星闪烁
+            gsap.to(star.material, {
+                opacity: 0.6,
+                duration: 0.8,
+                repeat: -1,
+                yoyo: true
+            });
+
+            gsap.to(starLight, {
+                intensity: 0.8,
+                duration: 0.8,
+                repeat: -1,
+                yoyo: true
+            });
+
+            // 树底礼物
+            const giftCount = 2 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < giftCount; i++) {
+                const giftSize = 0.4 + Math.random() * 0.3;
+                const giftAngle = (i / giftCount) * Math.PI * 2;
+                const giftRadius = 2.5 * scale + Math.random() * 1;
+                const gift = createPixelGift(
+                    (Math.cos(giftAngle) * giftRadius),
+                    0,
+                    (Math.sin(giftAngle) * giftRadius),
+                    giftSize
+                );
+                treeGroup.add(gift);
+            }
+
+            treeGroup.position.set(x, y, z);
+            return treeGroup;
+        }
+
+        // ==================== 创建礼物盒 ====================
+        function createPixelGift(x, y, z, size = 0.6) {
+            const giftGroup = new THREE.Group();
+
+            const boxColor = [CONFIG.colors.giftRed, CONFIG.colors.giftBlue, CONFIG.colors.gold][Math.floor(Math.random() * 3)];
+            const box = createPixelBox(size, size, size, boxColor);
+            box.position.y = size / 2;
+            giftGroup.add(box);
+
+            // 丝带
+            const ribbonV = createPixelBox(size * 0.25, size, size * 0.25, CONFIG.colors.gold);
+            ribbonV.position.set(0, size / 2, 0);
+            giftGroup.add(ribbonV);
+
+            const ribbonH = createPixelBox(size, size * 0.25, size * 0.25, CONFIG.colors.gold);
+            ribbonH.position.set(0, size / 2, 0);
+            giftGroup.add(ribbonH);
+
+            // 蝴蝶结
+            const bow = createPixelBox(size * 0.5, size * 0.3, size * 0.5, CONFIG.colors.gold);
+            bow.position.set(0, size + 0.15, 0);
+            giftGroup.add(bow);
+
+            giftGroup.position.set(x, y, z);
+
+            // 待机动画
+            gsap.to(giftGroup.position, {
+                y: y + 0.1,
+                duration: 1.2 + Math.random() * 0.5,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut"
+            });
+
+            return giftGroup;
+        }
+
+        // ==================== 创建像素角色（使用 Canvas 绘制可爱动物） ====================
+        function createCharacter(config) {
+            const characterGroup = new THREE.Group();
+            const scale = config.scale || 1;
+            const canvasSize = 128;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            const ctx = canvas.getContext('2d');
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+            // 设置像素风格
+            ctx.imageSmoothingEnabled = false;
+
+            // 绘制可爱的像素动物
+            const centerX = canvasSize / 2;
+            const centerY = canvasSize / 2;
+            const pixelSize = 4;
+
+            // 根据角色类型绘制
+            if (config.name === '田窝头') {
+                // 柯基小狗
+                // 身体 (棕色椭圆)
+                ctx.fillStyle = '#c4a882';
+                for (let i = 0; i < 200; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 60;
+                    const y = centerY + 15 + (Math.random() - 0.5) * 35;
+                    const size = pixelSize + Math.random() * pixelSize;
+                    ctx.fillRect(Math.floor(x / pixelSize) * pixelSize, Math.floor(y / pixelSize) * pixelSize, size, size);
+                }
+
+                // 头 (圆)
+                ctx.fillStyle = '#d8bc96';
+                for (let i = 0; i < 150; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 50;
+                    const y = centerY - 15 + (Math.random() - 0.5) * 45;
+                    const size = pixelSize + Math.random() * pixelSize;
+                    ctx.fillRect(Math.floor(x / pixelSize) * pixelSize, Math.floor(y / pixelSize) * pixelSize, size, size);
+                }
+
+                // 大耳朵
+                ctx.fillStyle = '#c4a882';
+                // 左耳
+                for (let i = 0; i < 40; i++) {
+                    const x = centerX - 30 + (Math.random() - 0.5) * 20;
+                    const y = centerY - 40 + (Math.random() - 0.5) * 25;
+                    ctx.fillRect(Math.floor(x / pixelSize) * pixelSize, Math.floor(y / pixelSize) * pixelSize, pixelSize * 2, pixelSize * 2);
+                }
+                // 右耳
+                for (let i = 0; i < 40; i++) {
+                    const x = centerX + 30 + (Math.random() - 0.5) * 20;
+                    const y = centerY - 40 + (Math.random() - 0.5) * 25;
+                    ctx.fillRect(Math.floor(x / pixelSize) * pixelSize, Math.floor(y / pixelSize) * pixelSize, pixelSize * 2, pixelSize * 2);
+                }
+
+                // 眼睛 (大而圆)
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(centerX - 12, centerY - 20, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(centerX + 12, centerY - 20, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 眼睛高光
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(centerX - 14, centerY - 22, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(centerX + 10, centerY - 22, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 鼻子 (黑色圆形)
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY - 5, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 嘴巴 (W形)
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(centerX - 6, centerY, 5, 0, Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centerX + 6, centerY, 5, 0, Math.PI);
+                ctx.stroke();
+
+                // 舌头 (粉色)
+                ctx.fillStyle = '#ff9999';
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY + 8, 6, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else {
+                // 猫咪 (其他三只)
+                // 身体 (圆润)
+                ctx.fillStyle = config.name === '田豆包' ? '#d0d0d0' : (config.name === '李花卷' ? '#e8d8f0' : '#888888');
+                for (let i = 0; i < 180; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 55;
+                    const y = centerY + 20 + (Math.random() - 0.5) * 30;
+                    const size = pixelSize + Math.random() * pixelSize;
+                    ctx.fillRect(Math.floor(x / pixelSize) * pixelSize, Math.floor(y / pixelSize) * pixelSize, size, size);
+                }
+
+                // 头 (更圆更大)
+                ctx.fillStyle = config.name === '田豆包' ? '#e0e0e0' : (config.name === '李花卷' ? '#f0e8f8' : '#999999');
+                for (let i = 0; i < 160; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 55;
+                    const y = centerY - 10 + (Math.random() - 0.5) * 50;
+                    const size = pixelSize + Math.random() * pixelSize;
+                    ctx.fillRect(Math.floor(x / pixelSize) * pixelSize, Math.floor(y / pixelSize) * pixelSize, size, size);
+                }
+
+                // 三角形耳朵
+                ctx.fillStyle = config.name === '田豆包' ? '#d0d0d0' : (config.name === '李花卷' ? '#e8d8f0' : '#888888');
+                // 左耳
+                ctx.beginPath();
+                ctx.moveTo(centerX - 35, centerY - 30);
+                ctx.lineTo(centerX - 25, centerY - 60);
+                ctx.lineTo(centerX - 10, centerY - 35);
+                ctx.fill();
+                // 右耳
+                ctx.beginPath();
+                ctx.moveTo(centerX + 35, centerY - 30);
+                ctx.lineTo(centerX + 25, centerY - 60);
+                ctx.lineTo(centerX + 10, centerY - 35);
+                ctx.fill();
+
+                // 内耳 (粉色)
+                ctx.fillStyle = '#ffb6c1';
+                ctx.beginPath();
+                ctx.moveTo(centerX - 32, centerY - 32);
+                ctx.lineTo(centerX - 25, centerY - 52);
+                ctx.lineTo(centerX - 15, centerY - 35);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(centerX + 32, centerY - 32);
+                ctx.lineTo(centerX + 25, centerY - 52);
+                ctx.lineTo(centerX + 15, centerY - 35);
+                ctx.fill();
+
+                // 眼睛 (大而圆的猫眼)
+                ctx.fillStyle = '#2c5aa0';
+                ctx.beginPath();
+                ctx.ellipse(centerX - 12, centerY - 15, 7, 9, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(centerX + 12, centerY - 15, 7, 9, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 瞳孔
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.ellipse(centerX - 12, centerY - 15, 3, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(centerX + 12, centerY - 15, 3, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 眼睛高光
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(centerX - 14, centerY - 17, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(centerX + 10, centerY - 17, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 小鼻子
+                ctx.fillStyle = '#ffb6c1';
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY - 2);
+                ctx.lineTo(centerX - 4, centerY + 3);
+                ctx.lineTo(centerX + 4, centerY + 3);
+                ctx.fill();
+
+                // 嘴巴
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY + 3);
+                ctx.lineTo(centerX, centerY + 10);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centerX - 6, centerY + 10, 6, 0, Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centerX + 6, centerY + 10, 6, 0, Math.PI);
+                ctx.stroke();
+
+                // 胡须
+                ctx.strokeStyle = '#888888';
+                ctx.lineWidth = 1.5;
+                // 左侧胡须
+                ctx.beginPath();
+                ctx.moveTo(centerX - 25, centerY);
+                ctx.lineTo(centerX - 45, centerY - 5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(centerX - 25, centerY + 5);
+                ctx.lineTo(centerX - 45, centerY + 5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(centerX - 25, centerY + 10);
+                ctx.lineTo(centerX - 45, centerY + 15);
+                ctx.stroke();
+                // 右侧胡须
+                ctx.beginPath();
+                ctx.moveTo(centerX + 25, centerY);
+                ctx.lineTo(centerX + 45, centerY - 5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(centerX + 25, centerY + 5);
+                ctx.lineTo(centerX + 45, centerY + 5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(centerX + 25, centerY + 10);
+                ctx.lineTo(centerX + 45, centerY + 15);
+                ctx.stroke();
+            }
+
+            // 创建纹理
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+
+            // 创建平面显示角色
+            const geometry = new THREE.PlaneGeometry(3 * scale, 3 * scale);
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            const sprite = new THREE.Mesh(geometry, material);
+
+            // 让角色始终面向相机
+            sprite.position.y = 1.5 * scale;
+
+            characterGroup.add(sprite);
+
+            characterGroup.position.set(config.position.x, config.position.y, config.position.z);
+            characterGroup.userData = config;
+
+            return characterGroup;
+        }
+
+        // ==================== 添加角色待机动画 ====================
+        function addIdleAnimation(character, name) {
+            // 现在动物们在跑动，添加轻微的上下跳动效果
+            const bounceSpeed = 2 + Math.random();
+            const bounceHeight = 0.1 + Math.random() * 0.1;
+
+            gsap.to(character.position, {
+                y: character.position.y + bounceHeight,
+                duration: bounceSpeed,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut"
+            });
+        }
+
+        // ==================== 创建雪花粒子 ====================
+        function createSnowflakes(count = 300) {
+            const snowflakes = [];
+
+            for (let i = 0; i < count; i++) {
+                const snowSize = 0.08 + Math.random() * 0.1;
+                const snowGeometry = new THREE.BoxGeometry(snowSize, snowSize, snowSize);
+                const snowMaterial = new THREE.MeshBasicMaterial({
+                    color: CONFIG.colors.white,
+                    transparent: true,
+                    opacity: 0.6 + Math.random() * 0.4
+                });
+
+                const snowflake = new THREE.Mesh(snowGeometry, snowMaterial);
+
+                snowflake.position.set(
+                    (Math.random() - 0.5) * 60,
+                    Math.random() * 40 + 10,
+                    (Math.random() - 0.5) * 60
+                );
+
+                snowflake.userData = {
+                    fallSpeed: 0.015 + Math.random() * 0.04,
+                    swaySpeed: 0.3 + Math.random() * 0.5,
+                    swayAmount: 0.3 + Math.random() * 0.8,
+                    offset: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.05
+                };
+
+                scene.add(snowflake);
+                snowflakes.push(snowflake);
+            }
+
+            return snowflakes;
+        }
+
+        // ==================== 更新雪花 ====================
+        function updateSnowflakes(snowflakes, time) {
+            snowflakes.forEach(snowflake => {
+                // 下落
+                snowflake.position.y -= snowflake.userData.fallSpeed;
+
+                // 左右飘动
+                snowflake.position.x += Math.sin(time * snowflake.userData.swaySpeed + snowflake.userData.offset) * 0.008;
+
+                // 旋转
+                snowflake.rotation.x += snowflake.userData.rotationSpeed;
+                snowflake.rotation.y += snowflake.userData.rotationSpeed * 0.5;
+
+                // 循环
+                if (snowflake.position.y < -8) {
+                    snowflake.position.y = 45;
+                    snowflake.position.x = (Math.random() - 0.5) * 60;
+                    snowflake.position.z = (Math.random() - 0.5) * 60;
+                }
+            });
+        }
+
+        // ==================== 初始化场景 ====================
+        function init() {
+            // 场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.colors.sky);
+            scene.fog = new THREE.Fog(CONFIG.colors.sky, 25, 60);
+
+            // 相机 (等轴测视角)
+            const aspect = window.innerWidth / window.innerHeight;
+            camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 1000);
+
+            // 等轴测相机位置
+            const isoDistance = 35;
+            const isoAngle = Math.atan(1 / Math.sqrt(2));
+            camera.position.set(
+                isoDistance * Math.cos(isoAngle),
+                isoDistance * Math.sin(isoAngle) * 0.8,
+                isoDistance * Math.sin(isoAngle)
+            );
+            camera.lookAt(0, 3, 0);
+
+            // 渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // 灯光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(15, 25, 15);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 100;
+            directionalLight.shadow.camera.left = -30;
+            directionalLight.shadow.camera.right = 30;
+            directionalLight.shadow.camera.top = 30;
+            directionalLight.shadow.camera.bottom = -30;
+            scene.add(directionalLight);
+
+            // 添加额外的环境光
+            const fillLight = new THREE.DirectionalLight(0x6688cc, 0.2);
+            fillLight.position.set(-10, 10, -10);
+            scene.add(fillLight);
+
+            // 创建场景元素
+            island = createIsland();
+            scene.add(island);
+
+            // 添加房子
+            const house = createHouse();
+            house.position.set(0, 0, 0);
+            island.add(house);
+
+            // 添加大圣诞树（中心）
+            const mainTree = createChristmasTree(-4, 0, 2, 1.5);
+            island.add(mainTree);
+
+            // 添加小圣诞树
+            const tree2 = createChristmasTree(5, 0, -3, 0.9);
+            island.add(tree2);
+
+            const tree3 = createChristmasTree(-6, 0, -4, 0.7);
+            island.add(tree3);
+
+            const tree4 = createChristmasTree(6, 0, 3, 0.6);
+            island.add(tree4);
+
+            // 添加散落的礼物
+            const giftPositions = [
+                { x: 2, y: 0.3, z: 5 },
+                { x: -1, y: 0.3, z: 6 },
+                { x: 6, y: 0.3, z: 1 },
+                { x: -7, y: 0.3, z: 1 },
+                { x: 5, y: 0.3, z: -5 },
+                { x: -5, y: 0.3, z: -6 },
+                { x: 0, y: 0.3, z: -6 },
+                { x: 7, y: 0.3, z: -1 }
+            ];
+
+            giftPositions.forEach(pos => {
+                const gift = createPixelGift(pos.x, pos.y, pos.z, 0.4 + Math.random() * 0.4);
+                island.add(gift);
+            });
+
+            // 添加角色
+            Object.values(CONFIG.characters).forEach(charConfig => {
+                const character = createCharacter(charConfig);
+                island.add(character);
+                characters.push(character);
+
+                // 收集角色网格用于点击检测
+                character.traverse((child) => {
+                    if (child.isMesh) {
+                        child.userData.character = character;
+                        characterMeshes.push(child);
+                    }
+                });
+
+                // 添加待机动画
+                addIdleAnimation(character, charConfig.name);
+            });
+
+            // 添加雪花
+            snowflakes = createSnowflakes();
+
+            // 添加背景星星
+            createBackgroundStars();
+
+            // 事件监听
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onMouseClick);
+            window.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mouseup', onMouseUp);
+            window.addEventListener('wheel', onMouseWheel);
+
+            // 隐藏加载提示
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 1200);
+        }
+
+        // ==================== 创建背景星星 ====================
+        function createBackgroundStars() {
+            for (let i = 0; i < 150; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 70 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.opacity = Math.random() * 0.5 + 0.3;
+                document.body.appendChild(star);
+            }
+        }
+
+        // ==================== 窗口调整 ====================
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ==================== 鼠标移动 ====================
+        function onMouseMove(event) {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = (event.clientY / window.innerHeight) * 2 - 1;
+
+            // 更新鼠标位置向量 (用于点击检测)
+            mouse.x = mouseX;
+            mouse.y = -mouseY;
+
+            // 拖拽旋转
+            if (isDragging) {
+                const deltaX = event.clientX - previousMousePosition.x;
+                const deltaY = event.clientY - previousMousePosition.y;
+
+                island.rotation.y += deltaX * 0.005;
+                island.rotation.x += deltaY * 0.005;
+                island.rotation.x = Math.max(-0.3, Math.min(0.3, island.rotation.x));
+
+                previousMousePosition = { x: event.clientX, y: event.clientY };
+            }
+
+            // 检测鼠标悬停的角色
+            checkCharacterHover(event);
+        }
+
+        // ==================== 检测角色悬停 ====================
+        function checkCharacterHover(event) {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(characterMeshes);
+
+            if (intersects.length > 0) {
+                let hoveredCharacter = intersects[0].object.userData.character;
+                if (hoveredCharacter && hoveredCharacter.userData) {
+                    nameTag.style.display = 'block';
+                    nameTag.style.left = event.clientX + 15 + 'px';
+                    nameTag.style.top = event.clientY - 15 + 'px';
+                    nameTag.textContent = hoveredCharacter.userData.name;
+                    document.body.style.cursor = 'pointer';
+                }
+            } else {
+                nameTag.style.display = 'none';
+                document.body.style.cursor = isDragging ? 'grabbing' : 'crosshair';
+            }
+        }
+
+        // ==================== 鼠标按下 ====================
+        function onMouseDown(event) {
+            if (event.button === 0) {
+                isDragging = true;
+                previousMousePosition = { x: event.clientX, y: event.clientY };
+                document.body.style.cursor = 'grabbing';
+            }
+        }
+
+        // ==================== 鼠标释放 ====================
+        function onMouseUp() {
+            isDragging = false;
+            document.body.style.cursor = 'crosshair';
+        }
+
+        // ==================== 鼠标滚轮 ====================
+        function onMouseWheel(event) {
+            const zoomSpeed = 0.001;
+            camera.position.multiplyScalar(1 + event.deltaY * zoomSpeed);
+
+            // 限制缩放范围
+            const distance = camera.position.length();
+            if (distance < 20) {
+                camera.position.setLength(20);
+            } else if (distance > 60) {
+                camera.position.setLength(60);
+            }
+        }
+
+        // ==================== 鼠标点击 ====================
+        function onMouseClick(event) {
+            if (isDragging) return;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(characterMeshes);
+
+            if (intersects.length > 0) {
+                let clickedCharacter = intersects[0].object.userData.character;
+                if (clickedCharacter && clickedCharacter.userData) {
+                    showDialog(clickedCharacter.userData);
+                    playCharacterAnimation(clickedCharacter);
+                }
+            }
+        }
+
+        // ==================== 角色点击动画 ====================
+        function playCharacterAnimation(character) {
+            // 保存原始Y位置
+            const originalY = character.userData.position.y;
+
+            // 跳跃动画（临时性的）
+            gsap.to(character.position, {
+                y: originalY + 1.5,
+                duration: 0.2,
+                yoyo: true,
+                repeat: 1,
+                ease: "power2.out",
+                onComplete: () => {
+                    // 动画结束后恢复到跑动的Y位置
+                    character.position.y = originalY;
+                }
+            });
+
+            // 缩放动画
+            gsap.to(character.scale, {
+                x: character.scale.x * 1.3,
+                y: character.scale.y * 1.3,
+                z: character.scale.z * 1.3,
+                duration: 0.15,
+                yoyo: true,
+                repeat: 1
+            });
+        }
+
+        // ==================== 显示 RPG 风格对话框 ====================
+        function showDialog(characterData) {
+            const overlay = document.getElementById('rpg-overlay');
+            const dialogContainer = document.getElementById('rpg-dialog-container');
+            const infoCard = document.getElementById('character-info-card');
+            const dialogText = document.getElementById('rpg-dialog-text');
+            const characterName = document.getElementById('rpg-character-name');
+            const avatarContainer = document.getElementById('dialog-avatar');
+
+            // 更新角色信息卡片
+            document.getElementById('info-name').textContent = characterData.name;
+            document.getElementById('info-type').textContent = characterData.type;
+            document.getElementById('info-personality').textContent = characterData.personality;
+            document.getElementById('info-cute').textContent = characterData.cute + '%';
+            document.getElementById('info-energy').textContent = characterData.energy + '%';
+            document.getElementById('cute-bar').style.width = characterData.cute + '%';
+            document.getElementById('energy-bar').style.width = characterData.energy + '%';
+            document.getElementById('info-description').innerHTML = characterData.description;
+
+            // 更新对话框名称
+            characterName.textContent = characterData.name;
+
+            // 创建角色头像
+            createCharacterAvatar(characterData, avatarContainer);
+
+            // 清空对话文本
+            dialogText.textContent = '';
+
+            // 显示遮罩层
+            overlay.classList.add('show');
+
+            // 延迟显示对话框（从小到大的动画）
+            setTimeout(() => {
+                dialogContainer.classList.add('show');
+            }, 100);
+
+            // 延迟显示信息卡片
+            setTimeout(() => {
+                infoCard.classList.add('show');
+            }, 200);
+
+            // 打字机效果
+            let i = 0;
+            const text = characterData.message;
+            const typeWriter = () => {
+                if (i < text.length) {
+                    dialogText.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 30);
+                }
+            };
+            setTimeout(typeWriter, 400);
+        }
+
+        // ==================== 创建角色头像 Canvas ====================
+        function createCharacterAvatar(config, container) {
+            // 清空容器
+            container.innerHTML = '';
+
+            const canvasSize = 150;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            const ctx = canvas.getContext('2d');
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+            // 背景
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+            // 绘制更大的角色头像
+            const centerX = canvasSize / 2;
+            const centerY = canvasSize / 2;
+
+            // 根据角色类型绘制
+            if (config.name === '田窝头') {
+                // 柯基小狗头像
+                ctx.fillStyle = '#c4a882';
+                for (let i = 0; i < 300; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 80;
+                    const y = centerY + 20 + (Math.random() - 0.5) * 45;
+                    ctx.fillRect(Math.floor(x / 4) * 4, Math.floor(y / 4) * 4, 4, 4);
+                }
+
+                ctx.fillStyle = '#d8bc96';
+                for (let i = 0; i < 220; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 70;
+                    const y = centerY - 15 + (Math.random() - 0.5) * 55;
+                    ctx.fillRect(Math.floor(x / 4) * 4, Math.floor(y / 4) * 4, 4, 4);
+                }
+
+                // 大耳朵
+                ctx.fillStyle = '#c4a882';
+                for (let i = 0; i < 60; i++) {
+                    const x = centerX - 40 + (Math.random() - 0.5) * 25;
+                    const y = centerY - 50 + (Math.random() - 0.5) * 30;
+                    ctx.fillRect(Math.floor(x / 4) * 4, Math.floor(y / 4) * 4, 6, 6);
+                }
+                for (let i = 0; i < 60; i++) {
+                    const x = centerX + 40 + (Math.random() - 0.5) * 25;
+                    const y = centerY - 50 + (Math.random() - 0.5) * 30;
+                    ctx.fillRect(Math.floor(x / 4) * 4, Math.floor(y / 4) * 4, 6, 6);
+                }
+
+                // 眼睛
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(centerX - 15, centerY - 25, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(centerX + 15, centerY - 25, 10, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 高光
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(centerX - 18, centerY - 28, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(centerX + 12, centerY - 28, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 鼻子
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY - 8, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 嘴巴
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(centerX - 8, centerY, 6, 0, Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centerX + 8, centerY, 6, 0, Math.PI);
+                ctx.stroke();
+
+                // 舌头
+                ctx.fillStyle = '#ff9999';
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY + 10, 8, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else {
+                // 猫咪头像
+                const bodyColor = config.name === '田豆包' ? '#d0d0d0' : (config.name === '李花卷' ? '#e8d8f0' : '#888888');
+                const headColor = config.name === '田豆包' ? '#e0e0e0' : (config.name === '李花卷' ? '#f0e8f8' : '#999999');
+
+                // 身体
+                ctx.fillStyle = bodyColor;
+                for (let i = 0; i < 250; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 75;
+                    const y = centerY + 25 + (Math.random() - 0.5) * 35;
+                    ctx.fillRect(Math.floor(x / 4) * 4, Math.floor(y / 4) * 4, 4, 4);
+                }
+
+                // 头
+                ctx.fillStyle = headColor;
+                for (let i = 0; i < 220; i++) {
+                    const x = centerX + (Math.random() - 0.5) * 72;
+                    const y = centerY - 12 + (Math.random() - 0.5) * 58;
+                    ctx.fillRect(Math.floor(x / 4) * 4, Math.floor(y / 4) * 4, 4, 4);
+                }
+
+                // 耳朵
+                ctx.fillStyle = bodyColor;
+                ctx.beginPath();
+                ctx.moveTo(centerX - 45, centerY - 35);
+                ctx.lineTo(centerX - 30, centerY - 75);
+                ctx.lineTo(centerX - 12, centerY - 40);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(centerX + 45, centerY - 35);
+                ctx.lineTo(centerX + 30, centerY - 75);
+                ctx.lineTo(centerX + 12, centerY - 40);
+                ctx.fill();
+
+                // 内耳
+                ctx.fillStyle = '#ffb6c1';
+                ctx.beginPath();
+                ctx.moveTo(centerX - 40, centerY - 38);
+                ctx.lineTo(centerX - 30, centerY - 65);
+                ctx.lineTo(centerX - 18, centerY - 42);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(centerX + 40, centerY - 38);
+                ctx.lineTo(centerX + 30, centerY - 65);
+                ctx.lineTo(centerX + 18, centerY - 42);
+                ctx.fill();
+
+                // 眼睛
+                ctx.fillStyle = '#2c5aa0';
+                ctx.beginPath();
+                ctx.ellipse(centerX - 15, centerY - 18, 9, 11, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(centerX + 15, centerY - 18, 9, 11, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 瞳孔
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(centerX - 15, centerY - 18, 4, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(centerX + 15, centerY - 18, 4, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 高光
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(centerX - 18, centerY - 21, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(centerX + 12, centerY - 21, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 鼻子
+                ctx.fillStyle = '#ffb6c1';
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY + 2);
+                ctx.lineTo(centerX - 5, centerY + 8);
+                ctx.lineTo(centerX + 5, centerY + 8);
+                ctx.fill();
+
+                // 嘴巴
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY + 8);
+                ctx.lineTo(centerX, centerY + 18);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centerX - 8, centerY + 18, 8, 0, Math.PI);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(centerX + 8, centerY + 18, 8, 0, Math.PI);
+                ctx.stroke();
+
+                // 胡须
+                ctx.strokeStyle = '#888';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(centerX - 30, centerY - 3 + i * 8);
+                    ctx.lineTo(centerX - 55, centerY - 8 + i * 8);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(centerX + 30, centerY - 3 + i * 8);
+                    ctx.lineTo(centerX + 55, centerY - 8 + i * 8);
+                    ctx.stroke();
+                }
+            }
+
+            container.appendChild(canvas);
+        }
+
+        // ==================== 关闭 RPG 对话框 ====================
+        function closeRPGDialog(event) {
+            const overlay = document.getElementById('rpg-overlay');
+            const dialogContainer = document.getElementById('rpg-dialog-container');
+            const infoCard = document.getElementById('character-info-card');
+
+            // 隐藏动画
+            dialogContainer.classList.remove('show');
+            infoCard.classList.remove('show');
+
+            // 延迟隐藏遮罩层
+            setTimeout(() => {
+                overlay.classList.remove('show');
+            }, 300);
+        }
+
+        // ==================== 动画循环 ====================
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime();
+
+            // 更新雪花
+            updateSnowflakes(snowflakes, time);
+
+            // 让动物们在环形跑道上跑动
+            characters.forEach(character => {
+                const config = character.userData;
+                if (config.orbitRadius && config.orbitSpeed !== undefined) {
+                    const angle = time * config.orbitSpeed + config.orbitOffset;
+                    character.position.x = Math.cos(angle) * config.orbitRadius;
+                    character.position.z = 8 + Math.sin(angle) * config.orbitRadius;
+                    // 让角色朝向跑动方向
+                    character.rotation.y = -angle + Math.PI / 2;
+                }
+            });
+
+            // 鼠标视差效果（当没有拖拽时）
+            if (!isDragging) {
+                targetRotationY = mouseX * 0.15;
+                targetRotationX = mouseY * 0.08;
+
+                if (island) {
+                    island.rotation.y += (targetRotationY - island.rotation.y) * 0.03;
+                    island.rotation.x += ((targetRotationX * 0.5) - island.rotation.x) * 0.03;
+
+                    // 限制X轴旋转
+                    island.rotation.x = Math.max(-0.2, Math.min(0.2, island.rotation.x));
+                }
+            }
+
+            // 让角色平面始终面向相机
+            characters.forEach(character => {
+                character.children.forEach(child => {
+                    if (child.isMesh) {
+                        child.lookAt(camera.position);
+                    }
+                });
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // ==================== 启动 ====================
+        init();
+        animate();
+
+        // 全局函数
+        window.closeRPGDialog = closeRPGDialog;
+
+        // 音乐控制
+        let musicPlaying = false;
+        const musicAudio = document.getElementById('christmas-music');
+        const musicToggle = document.getElementById('music-toggle');
+
+        function toggleMusic() {
+            if (musicPlaying) {
+                musicAudio.pause();
+                musicToggle.textContent = '🎵 音乐: OFF';
+                musicPlaying = false;
+            } else {
+                musicAudio.volume = 0.3;
+                musicAudio.play().catch(e => {
+                    console.log('音乐播放需要用户交互:', e);
+                });
+                musicToggle.textContent = '🎵 音乐: ON';
+                musicPlaying = true;
+            }
+        }
+
+        window.toggleMusic = toggleMusic;
+    </script>
+</body>
+</html>
