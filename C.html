@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boluopets: RPG Archipelago (Fixed)</title>
+    <!-- 引入像素字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            background: linear-gradient(to bottom, #4CA1AF 0%, #C4E0E5 100%);
+            font-family: 'VT323', monospace; /* 全局像素字体 */
+            cursor: none; /* 保持自定义光标 */
+        }
+
+        /* --- UI: Loading Screen --- */
+        #loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #2b5876;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            transition: opacity 1s ease-out;
+            pointer-events: none;
+        }
+
+        #loader h1 {
+            color: white;
+            font-size: 3rem;
+            text-shadow: 4px 4px 0px #000;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+        }
+        #loader p { color: #fff; font-size: 1.5rem; }
+
+        /* --- UI: Custom Cursor --- */
+        #cursor {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' stroke='black' stroke-width='2'%3E%3Cpath d='M12 2v16m-4-4l4 4 4-4M5 14a8 8 0 0 1 14 0' /%3E%3Ccircle cx='12' cy='4' r='2' /%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            z-index: 2000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s;
+        }
+        
+        /* --- UI: Helper Text --- */
+        #ui-help {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #004466;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.5);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* --- UI: RPG Dialog (Hidden by default) --- */
+        #game-ui {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            max-width: 90%;
+            height: 180px;
+            background-color: #f4e4bc; /* 羊皮纸色 */
+            border: 4px solid #4a3c31; /* 深褐色边框 */
+            box-shadow: 
+                inset 4px 4px 0px rgba(255,255,255,0.5),
+                inset -4px -4px 0px rgba(0,0,0,0.2),
+                8px 8px 0px rgba(0,0,0,0.3);
+            display: flex;
+            padding: 10px;
+            font-family: 'VT323', monospace;
+            opacity: 0;
+            pointer-events: none; /* 初始不可点击 */
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        #game-ui.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 左侧头像区 */
+        #ui-avatar-container {
+            width: 150px;
+            height: 150px;
+            border: 4px solid #4a3c31;
+            background: #000;
+            margin-right: 20px;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #ui-avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: pixelated; /* 像素化图片 */
+        }
+
+        /* 右侧内容区 */
+        #ui-content {
+            flex-grow: 1;
+            position: relative;
+            color: #4a3c31;
+        }
+
+        #ui-title {
+            margin: 0;
+            font-size: 2rem;
+            text-transform: uppercase;
+            border-bottom: 2px dashed #4a3c31;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        #ui-desc {
+            font-size: 1.4rem;
+            line-height: 1.2;
+            margin: 0;
+            min-height: 3.6rem; /* 预留高度 */
+        }
+
+        /* 闪烁的光标/按钮 */
+        #ui-btn {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            font-size: 1.2rem;
+            background: #4a3c31;
+            color: #f4e4bc;
+            padding: 5px 10px;
+            cursor: pointer;
+            animation: blink 1s infinite;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        #ui-btn:hover {
+            background: #ff5555;
+            color: white;
+            animation: none;
+        }
+
+        #ui-close {
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            background: #ff5555;
+            color: white;
+            width: 40px;
+            height: 40px;
+            text-align: center;
+            line-height: 40px;
+            font-size: 1.5rem;
+            border: 4px solid #fff;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: none; /* 只在 active 时显示逻辑 */
+        }
+        #game-ui.active #ui-close { display: block; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 0.5; transform: translateY(2px); }
+        }
+
+        /* 遮罩层，用于点击退出 */
+        #overlay-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            z-index: 990; /* 在 UI 之下 */
+        }
+        #overlay-mask.active { display: block; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Loading -->
+    <div id="loader">
+        <h1>BOLUOPETS ARCHIPELAGO</h1>
+        <p>Generating World...</p>
+    </div>
+
+    <!-- Cursor -->
+    <div id="cursor"></div>
+    
+    <!-- Help Text -->
+    <div id="ui-help">
+        <p>⚓ CLICK islands to explore</p>
+        <p>🖱️ DRAG to rotate view</p>
+    </div>
+
+    <!-- RPG Dialog UI -->
+    <div id="overlay-mask"></div> <!-- 点击此处退出聚焦 -->
+    <div id="game-ui">
+        <div id="ui-avatar-container">
+            <img id="ui-avatar" src="" alt="Project Cover">
+        </div>
+        <div id="ui-content">
+            <h2 id="ui-title">Title</h2>
+            <p id="ui-desc"></p>
+            <a href="#" id="ui-btn" target="_blank">[ OPEN DEMO ] ▶</a>
+        </div>
+        <div id="ui-close">X</div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 1. DATA STRUCTURE (数据配置) ---
+        // 你可以在这里把 'cover' 换成真实的 GIF 链接，把 'link' 换成真实的 HTML 路径
+        const projects = [
+            {
+                // Center Island
+                x: 0, z: 0, type: 'lighthouse',
+                name: "Beacon System",
+                description: "A comprehensive design system for React applications. Modular, accessible, and themeable.",
+                cover: "https://placehold.co/150x150/FF6B6B/FFFFFF/png?text=Beacon", 
+                link: "#",
+                themeColor: '#FF6B6B'
+            },
+            {
+                // Left Island
+                x: -14, z: 8, type: 'palm',
+                name: "Coco Adventure",
+                description: "A relaxing web-based farming simulator. Grow coconuts, trade with crabs, and chill.",
+                cover: "https://placehold.co/150x150/4ECDC4/FFFFFF/png?text=Coco", 
+                link: "#",
+                themeColor: '#4ECDC4'
+            },
+            {
+                // Right Island
+                x: 14, z: 6, type: 'cabin',
+                name: "Lodge.io SaaS",
+                description: "Booking management platform for remote cabins. Includes calendar and payment integration.",
+                cover: "https://placehold.co/150x150/FFD93D/000000/png?text=Lodge", 
+                link: "#",
+                themeColor: '#FFD93D'
+            },
+            {
+                // Front Island
+                x: 5, z: -14, type: 'windmill',
+                name: "Eco Landing",
+                description: "Award-winning landing page for renewable energy startup. High performance 3D visuals.",
+                cover: "https://placehold.co/150x150/95E1D3/000000/png?text=Eco", 
+                link: "#",
+                themeColor: '#95E1D3'
+            }
+        ];
+
+        // --- 2. SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xC4E0E5, 40, 150); 
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const initialCamPos = { x: 0, y: 40, z: 70 };
+        camera.position.set(initialCamPos.x, initialCamPos.y, initialCamPos.z); 
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.1;
+        controls.minDistance = 10;
+        controls.maxDistance = 120;
+
+        // Custom Cursor Logic
+        const cursor = document.getElementById('cursor');
+        const mouse = new THREE.Vector2();
+        const raycaster = new THREE.Raycaster();
+
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+            
+            // FIXED: Correct NDC calculation for Three.js
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1; // +1 is correct for top-left origin
+        });
+
+        // --- 3. LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        sunLight.position.set(50, 80, 30);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.left = -60;
+        sunLight.shadow.camera.right = 60;
+        sunLight.shadow.camera.top = 60;
+        sunLight.shadow.camera.bottom = -60;
+        sunLight.shadow.radius = 2; 
+        scene.add(sunLight);
+
+        // --- 4. OCEAN ---
+        const seabed = new THREE.Mesh(
+            new THREE.PlaneGeometry(300, 300).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ color: 0x1a5c7a })
+        );
+        seabed.position.y = -5;
+        scene.add(seabed);
+
+        const waterGeometry = new THREE.PlaneGeometry(200, 200, 60, 60).rotateX(-Math.PI / 2);
+        const waterPos = waterGeometry.attributes.position;
+        const waterInitPos = [];
+        for (let i = 0; i < waterPos.count; i++) {
+            waterInitPos.push({ x: waterPos.getX(i), y: waterPos.getY(i), z: waterPos.getZ(i) });
+        }
+        const water = new THREE.Mesh(
+            waterGeometry,
+            new THREE.MeshPhysicalMaterial({
+                color: 0x29C2E3, roughness: 0.4, metalness: 0, reflectivity: 0.1,
+                transmission: 0.8, transparent: true, opacity: 0.85, flatShading: true, side: THREE.DoubleSide
+            })
+        );
+        water.receiveShadow = true;
+        scene.add(water);
+
+        // --- 5. TEXTURE & ISLAND GENERATION ---
+        function createInfoTexture(title, description, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color; ctx.fillRect(0, 0, 512, 512);
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 20; ctx.strokeRect(20, 20, 472, 472);
+            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(256, 180, 100, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 60px "Courier New"'; ctx.textAlign = 'center';
+            ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 4;
+            ctx.fillText(title.toUpperCase(), 256, 350);
+            ctx.font = '30px "Courier New"'; ctx.fillText(description.substring(0, 20) + "...", 256, 400);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        const islands = [];
+        const islandGroup = new THREE.Group();
+        scene.add(islandGroup);
+
+        const materials = {
+            sand: new THREE.MeshLambertMaterial({ color: 0xE6C288 }),
+            grass: new THREE.MeshLambertMaterial({ color: 0x8BC34A }),
+            wood: new THREE.MeshStandardMaterial({ color: 0x8D6E63 }),
+            stone: new THREE.MeshStandardMaterial({ color: 0x9E9E9E }),
+            white: new THREE.MeshStandardMaterial({ color: 0xFFFFFF }),
+            red: new THREE.MeshStandardMaterial({ color: 0xEF5350 }),
+            leaf: new THREE.MeshStandardMaterial({ color: 0x66BB6A })
+        };
+
+        function createIsland(projectData, index) {
+            const { x, z, type, name, description, themeColor } = projectData;
+            const group = new THREE.Group();
+            
+            // Attach project data to the 3D object for retrieval on click
+            group.userData = {
+                id: index,
+                isIsland: true,
+                project: projectData, // Store full data
+                floatOffset: Math.random() * Math.PI * 2,
+                floatSpeed: 0.8 + Math.random() * 0.4
+            };
+
+            // Base
+            const baseSize = 8;
+            const sand = new THREE.Mesh(new THREE.BoxGeometry(baseSize, 3, baseSize), materials.sand);
+            sand.position.y = -1.5; sand.receiveShadow = true;
+            group.add(sand);
+            const grass = new THREE.Mesh(new THREE.BoxGeometry(baseSize - 0.5, 0.6, baseSize - 0.5), materials.grass);
+            grass.position.y = 0.3; grass.receiveShadow = true; grass.castShadow = true;
+            group.add(grass);
+
+            // Billboard
+            const boardGroup = new THREE.Group();
+            boardGroup.position.set(2, 2.5, 2); 
+            boardGroup.rotation.y = -Math.PI / 6;
+            const postGeo = new THREE.BoxGeometry(0.2, 3, 0.2);
+            const post1 = new THREE.Mesh(postGeo, materials.wood); post1.position.x = -1.5;
+            const post2 = new THREE.Mesh(postGeo, materials.wood); post2.position.x = 1.5;
+            boardGroup.add(post1, post2);
+            
+            const boardMat = new THREE.MeshStandardMaterial({ 
+                map: createInfoTexture(name, description, themeColor), roughness: 0.6 
+            });
+            const board = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.2, 0.2), boardMat);
+            board.position.y = 1; board.castShadow = true;
+            boardGroup.add(board);
+            group.add(boardGroup);
+
+            // Landmark
+            const landmark = new THREE.Group();
+            landmark.position.set(-1.5, 0.6, -1.5);
+            if (type === 'lighthouse') {
+                const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 5, 7), materials.white); tower.position.y = 2.5; tower.castShadow = true; landmark.add(tower);
+                const top = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.8, 1, 7), materials.red); top.position.y = 5; landmark.add(top);
+            } else if (type === 'palm') {
+                for(let i=0; i<6; i++) {
+                    const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.5), materials.wood);
+                    trunk.position.set(Math.sin(i*0.3)*0.5, i*0.7, 0); trunk.rotation.z = -0.1 * i; landmark.add(trunk);
+                }
+                const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 1, 5), materials.leaf); leaves.position.set(1.2, 4, 0); landmark.add(leaves);
+            } else if (type === 'cabin') {
+                const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), materials.wood); cabin.position.y = 1; cabin.castShadow = true; landmark.add(cabin);
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.5, 4), materials.red); roof.position.y = 2.75; roof.rotation.y = Math.PI/4; landmark.add(roof);
+            } else if (type === 'windmill') {
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 3, 6), materials.stone); body.position.y = 1.5; body.castShadow = true; landmark.add(body);
+                const blades = new THREE.Group();
+                const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4.5, 0.1), materials.white);
+                const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4.5, 0.1), materials.white); b2.rotation.z = Math.PI/2;
+                blades.add(b1, b2); blades.position.set(0, 3, 0.6);
+                group.userData.blades = blades; landmark.add(blades);
+            }
+            group.add(landmark);
+
+            group.position.set(x, 800, z); // Start high for drop
+            islandGroup.add(group);
+            islands.push(group);
+            return group;
+        }
+
+        // Generate islands from PROJECTS data
+        projects.forEach((data, i) => createIsland(data, i));
+
+        // Bridges (Simplified connection logic)
+        function createBridges() {
+            const center = islands[0];
+            const others = islands.slice(1);
+            const plankGeo = new THREE.BoxGeometry(1.0, 0.1, 0.4);
+            others.forEach(target => {
+                const start = new THREE.Vector3(center.position.x, 0.5, center.position.z);
+                const end = new THREE.Vector3(target.position.x, 0.5, target.position.z);
+                const dist = start.distanceTo(end);
+                const steps = Math.floor(dist / 0.8);
+                const dir = new THREE.Vector3().subVectors(end, start).normalize();
+                for(let k=2; k<steps-2; k++) {
+                    const plank = new THREE.Mesh(plankGeo, materials.wood);
+                    const pos = new THREE.Vector3().copy(start).add(dir.clone().multiplyScalar(k * 0.8));
+                    const sag = Math.sin((k/steps) * Math.PI) * -1.0;
+                    plank.position.set(pos.x, 1.0 + sag, pos.z);
+                    plank.lookAt(end); plank.castShadow = true;
+                    plank.userData.isPlank = true; plank.userData.finalY = plank.position.y; plank.position.y += 800;
+                    islandGroup.add(plank); islands.push(plank);
+                }
+            });
+        }
+        createBridges();
+
+        // Clouds (Decor)
+        const cloudGeo = new THREE.BoxGeometry(1, 1, 1);
+        const cloudMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8 });
+        const clouds = [];
+        for(let i=0; i<8; i++) {
+            const cGroup = new THREE.Group();
+            for(let j=0; j<5; j++) {
+                const m = new THREE.Mesh(cloudGeo, cloudMat);
+                m.position.set((Math.random()-0.5)*4, (Math.random()-0.5)*1.5, (Math.random()-0.5)*2);
+                m.scale.setScalar(Math.random()*1.5 + 0.5); cGroup.add(m);
+            }
+            cGroup.position.set((Math.random()-0.5)*120, 25+Math.random()*15, (Math.random()-0.5)*80);
+            scene.add(cGroup); clouds.push({ mesh: cGroup, speed: 0.01 + Math.random()*0.02 });
+        }
+
+        // --- 6. INTERACTION LOGIC (The RPG System) ---
+        let isExploring = false; // State flag
+        let typeWriterInterval;
+
+        const ui = {
+            container: document.getElementById('game-ui'),
+            avatar: document.getElementById('ui-avatar'),
+            title: document.getElementById('ui-title'),
+            desc: document.getElementById('ui-desc'),
+            btn: document.getElementById('ui-btn'),
+            close: document.getElementById('ui-close'),
+            mask: document.getElementById('overlay-mask')
+        };
+
+        // Click Handler
+        window.addEventListener('click', onMouseClick);
+
+        function onMouseClick(event) {
+            // Check if clicking UI elements - if so, don't trigger scene logic
+            if (event.target.closest('#game-ui')) return;
+
+            // If exploring, clicking mask or outside UI resets view
+            if (isExploring) {
+                resetView();
+                return;
+            }
+
+            // Raycast for Island
+            // Update mouse coordinates for accuracy on click
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(islandGroup.children, true);
+
+            if (intersects.length > 0) {
+                // Find parent group
+                let target = intersects[0].object;
+                while (target && !target.userData.isIsland) {
+                    target = target.parent;
+                }
+
+                if (target && target.userData.project) {
+                    focusIsland(target);
+                }
+            }
+        }
+
+        // Focus Animation
+        function focusIsland(islandGroup) {
+            isExploring = true;
+            ui.mask.classList.add('active'); // Enable overlay mask to catch clicks
+            
+            // Calculate Camera Target Position
+            // We want to look at the island from slightly in front and above
+            const offset = { x: 0, y: 15, z: 25 }; 
+            // Add island position
+            const targetPos = {
+                x: islandGroup.position.x + offset.x,
+                y: islandGroup.position.y + offset.y,
+                z: islandGroup.position.z + offset.z
+            };
+
+            // 1. Animate Camera Position
+            gsap.to(camera.position, {
+                x: targetPos.x,
+                y: targetPos.y,
+                z: targetPos.z,
+                duration: 1.5,
+                ease: "power2.inOut"
+            });
+
+            // 2. Animate Controls Target (LookAt)
+            gsap.to(controls.target, {
+                x: islandGroup.position.x,
+                y: islandGroup.position.y + 2, // Look slightly up at the building
+                z: islandGroup.position.z,
+                duration: 1.5,
+                ease: "power2.inOut",
+                onComplete: () => {
+                    showDialog(islandGroup.userData.project);
+                }
+            });
+        }
+
+        // Reset Animation
+        function resetView() {
+            isExploring = false;
+            hideDialog();
+            ui.mask.classList.remove('active');
+
+            // 1. Animate Camera back to overview
+            gsap.to(camera.position, {
+                x: initialCamPos.x,
+                y: initialCamPos.y,
+                z: initialCamPos.z,
+                duration: 1.2,
+                ease: "power2.inOut"
+            });
+
+            // 2. Reset LookAt
+            gsap.to(controls.target, {
+                x: 0, y: 0, z: 0,
+                duration: 1.2,
+                ease: "power2.inOut"
+            });
+        }
+
+        // UI Logic
+        function showDialog(project) {
+            ui.container.classList.add('active');
+            
+            // Set Content
+            ui.title.innerText = project.name;
+            ui.avatar.src = project.cover;
+            ui.btn.href = project.link;
+            
+            // Typewriter Effect
+            ui.desc.innerText = "";
+            const text = project.description;
+            let i = 0;
+            clearInterval(typeWriterInterval);
+            
+            typeWriterInterval = setInterval(() => {
+                if (i < text.length) {
+                    ui.desc.innerText += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typeWriterInterval);
+                }
+            }, 30); // 30ms per char
+        }
+
+        function hideDialog() {
+            ui.container.classList.remove('active');
+            clearInterval(typeWriterInterval);
+        }
+
+        // Close button listener
+        ui.close.addEventListener('click', resetView);
+        ui.mask.addEventListener('click', resetView);
+
+
+        // --- 7. ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function startIntro() {
+            gsap.to("#loader", { opacity: 0, duration: 0.8, onComplete: () => document.getElementById('loader').style.display = 'none' });
+            islands.forEach((obj, i) => {
+                const targetY = obj.userData.isPlank ? obj.userData.finalY : 0;
+                gsap.to(obj.position, {
+                    y: targetY, duration: 2.0, ease: "elastic.out(1, 0.5)", delay: i * 0.03
+                });
+            });
+        }
+        setTimeout(startIntro, 100);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            // Water
+            for (let i = 0; i < waterPos.count; i++) {
+                const x = waterInitPos[i].x; const y = waterInitPos[i].y; 
+                let z = Math.sin(x * 0.1 + time * 0.8) * Math.cos(y * 0.1 + time * 0.8) * 0.5;
+                z += Math.sin(x * 0.3 - time * 1.5) * 0.3;
+                z += Math.cos(y * 0.5 + time * 2.0) * 0.1;
+                waterPos.setZ(i, z);
+            }
+            waterPos.needsUpdate = true;
+            waterGeometry.computeVertexNormals();
+
+            // Island Float & Raycasting (Only when not exploring)
+            raycaster.setFromCamera(mouse, camera);
+            // Only raycast if NOT exploring to save perf and avoid hover effects during dialog
+            let intersects = [];
+            if (!isExploring) {
+                intersects = raycaster.intersectObjects(islandGroup.children, true);
+            }
+
+            islands.forEach(obj => {
+                if (obj.userData.isPlank) return;
+
+                // Float physics
+                if (obj.position.y < 10) {
+                    const floatY = Math.sin(time * obj.userData.floatSpeed + obj.userData.floatOffset) * 0.25;
+                    if(time > 3) obj.position.y = floatY;
+                }
+                if (obj.userData.blades) obj.userData.blades.rotation.z -= 0.03;
+
+                // Hover Logic
+                let isHovered = false;
+                if (!isExploring && intersects.length > 0) {
+                    let parent = intersects[0].object;
+                    while(parent) {
+                        if(parent === obj) { isHovered = true; break; }
+                        parent = parent.parent;
+                    }
+                }
+
+                if (isHovered) {
+                    const targetRotX = mouse.y * 0.15;
+                    const targetRotZ = mouse.x * 0.15;
+                    obj.rotation.x += (targetRotX - obj.rotation.x) * 0.1;
+                    obj.rotation.z += (-targetRotZ - obj.rotation.z) * 0.1;
+                    obj.scale.setScalar(1.1);
+                    cursor.style.transform = `translate(-50%, -50%) scale(1.5)`;
+                    cursor.style.opacity = '1';
+                } else {
+                    obj.rotation.x *= 0.9;
+                    obj.rotation.z *= 0.9;
+                    obj.scale.setScalar(1.0);
+                }
+            });
+            
+            if (!isExploring && intersects.length === 0) {
+                 cursor.style.transform = `translate(-50%, -50%) scale(1)`;
+                 cursor.style.opacity = '0.7';
+            } else if (isExploring) {
+                 cursor.style.opacity = '1'; // Show cursor clearly during UI
+                 cursor.style.transform = `translate(-50%, -50%) scale(1)`;
+            }
+
+            // Clouds
+            clouds.forEach(c => {
+                c.mesh.position.x += c.speed;
+                if(c.mesh.position.x > 100) c.mesh.position.x = -100;
+            });
+
+            // Camera Drift (Only when not exploring)
+            if (!isExploring) {
+                camera.position.x += (mouse.x * 2 - camera.position.x + initialCamPos.x) * 0.02;
+                camera.position.y += ((initialCamPos.y + mouse.y * 2) - camera.position.y) * 0.02;
+                camera.lookAt(0, 0, 0);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

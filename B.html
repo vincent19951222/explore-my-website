@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boluopets: The Rustic Factory</title>
+    <style>
+        /* --- 基础设置 & 字体 --- */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            background-color: #f0e6d2;
+            font-family: 'VT323', monospace;
+            cursor: none; /* 隐藏系统默认光标 */
+        }
+
+        /* --- 沉浸式 Canvas 容器 --- */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none; /* 让鼠标穿透 Canvas */
+        }
+
+        /* --- 虚拟滚动高度 --- */
+        #scroll-dummy {
+            height: 800vh;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0;
+            pointer-events: auto; /* 接收滚动事件 */
+        }
+
+        /* --- UI 覆盖层 --- */
+        #ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #5D4037;
+            font-size: 3rem;
+            text-shadow: 2px 2px 0px #FFCCBC;
+            margin: 0;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: #795548;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 0.5rem;
+        }
+
+        .scroll-hint {
+            align-self: center;
+            color: #5D4037;
+            font-size: 1.5rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+            40% {transform: translateY(-10px);}
+            60% {transform: translateY(-5px);}
+        }
+
+        /* --- 修复：更稳定的自定义光标 (CSS 绘制) --- */
+        #cursor {
+            width: 20px;
+            height: 20px;
+            background-color: #FF7043; /* 醒目的橙色 */
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 2px 2px 0px #5D4037; /* 像素阴影 */
+            transition: transform 0.1s;
+        }
+        
+        /* 十字准星装饰 */
+        #cursor::before, #cursor::after {
+            content: '';
+            position: absolute;
+            background: white;
+        }
+        #cursor::before {
+            top: 8px; left: -4px; width: 28px; height: 4px;
+        }
+        #cursor::after {
+            top: -4px; left: 8px; width: 4px; height: 28px;
+        }
+
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #8D6E63;
+            z-index: 100;
+            display: flex; justify-content: center; align-items: center;
+            color: #fff; font-size: 2rem;
+            transition: opacity 0.5s;
+        }
+
+    </style>
+    <!-- Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://esm.sh/three@0.160.0",
+                "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
+                "gsap": "https://esm.sh/gsap@3.12.5",
+                "gsap/ScrollTrigger": "https://esm.sh/gsap@3.12.5/ScrollTrigger"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loader">BUILDING FACTORY...</div>
+    <div id="cursor"></div>
+
+    <div id="ui-layer">
+        <header>
+            <h1>BOLUOPETS</h1>
+            <div class="subtitle">The Rustic Factory</div>
+        </header>
+        <div class="scroll-hint">▼ SCROLL TO OPERATE CRANE ▼</div>
+    </div>
+
+    <div id="canvas-container"></div>
+    <div id="scroll-dummy"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import gsap from 'gsap';
+        import ScrollTrigger from 'gsap/ScrollTrigger';
+
+        gsap.registerPlugin(ScrollTrigger);
+
+        // --- 配置 ---
+        const config = {
+            colors: {
+                background: 0xAED581,
+                ground: 0x7CB342,
+                woodDark: 0x4E342E,   // 更深的木色，增加对比
+                woodLight: 0x8D6E63,
+                stone: 0x90A4AE,
+                skin: 0xFFCCBC,       // 肤色
+                blue: 0x1E88E5,       // 工装裤蓝
+                yellow: 0xFDD835,     // 草帽黄
+                shirt: 0xFF5722       // 衬衫红
+            }
+        };
+
+        let scene, camera, renderer, composer;
+        let clock = new THREE.Clock();
+        let mouse = new THREE.Vector2();
+
+        const factory = {
+            beltCurve: null,
+            crates: [],
+            crane: { group: null, arm: null, rope: null, claw: null },
+            operator: null, // 小人
+            particles: [],
+            windmillBlade: null
+        };
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(config.colors.background);
+            scene.fog = new THREE.Fog(config.colors.background, 10, 50);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(16, 14, 16); // 稍微拉近一点视角
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 光照
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xFFE0B2, 1.8);
+            dirLight.position.set(10, 20, 5);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.set(2048, 2048);
+            scene.add(dirLight);
+
+            // Bloom
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0.7;
+            bloomPass.strength = 0.3;
+            bloomPass.radius = 0.5;
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            buildWorld();
+            
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+
+            setTimeout(() => {
+                document.getElementById('loader').style.opacity = 0;
+                setTimeout(() => document.getElementById('loader').remove(), 500);
+            }, 1000);
+
+            animate();
+            setupScrollAnimation();
+        }
+
+        function buildWorld() {
+            // 1. 地基
+            const islandGeo = new THREE.BoxGeometry(30, 4, 30);
+            const islandMat = new THREE.MeshStandardMaterial({ color: config.colors.ground, roughness: 1 });
+            const island = new THREE.Mesh(islandGeo, islandMat);
+            island.position.y = -2;
+            island.receiveShadow = true;
+            scene.add(island);
+
+            // 2. 草地 (Instance)
+            const grassCount = 2000;
+            const grassGeo = new THREE.BoxGeometry(0.15, 0.4, 0.15);
+            grassGeo.translate(0, 0.2, 0);
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x8BC34A });
+            const grassMesh = new THREE.InstancedMesh(grassGeo, grassMat, grassCount);
+            const dummy = new THREE.Object3D();
+            
+            for(let i=0; i<grassCount; i++) {
+                let x = (Math.random() - 0.5) * 28;
+                let z = (Math.random() - 0.5) * 28;
+                if(Math.abs(x) < 6 && Math.abs(z) < 6) continue; // 留出更大空间给机器
+
+                dummy.position.set(x, 0, z);
+                dummy.scale.setScalar(0.5 + Math.random() * 1.0);
+                dummy.rotation.y = Math.random() * Math.PI;
+                dummy.updateMatrix();
+                grassMesh.setMatrixAt(i, dummy.matrix);
+            }
+            grassMesh.receiveShadow = true;
+            scene.add(grassMesh);
+
+            // 3. 传送带
+            const points = [
+                new THREE.Vector3(-12, 0.5, -8),
+                new THREE.Vector3(-5, 0.5, -8),
+                new THREE.Vector3(0, 0.5, 0),
+                new THREE.Vector3(5, 0.5, 8),
+                new THREE.Vector3(12, 0.5, 8)
+            ];
+            factory.beltCurve = new THREE.CatmullRomCurve3(points);
+            
+            const pathPoints = factory.beltCurve.getPoints(120);
+            const rollerGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.0, 8);
+            rollerGeo.rotateZ(Math.PI / 2);
+            const rollerMat = new THREE.MeshStandardMaterial({ color: config.colors.woodLight });
+            
+            pathPoints.forEach((p, i) => {
+                if (i % 2 !== 0) return;
+                const tangent = factory.beltCurve.getTangent(i / 120);
+                const axis = new THREE.Vector3(0, 1, 0).cross(tangent).normalize();
+                
+                const roller = new THREE.Mesh(rollerGeo, rollerMat);
+                roller.position.copy(p);
+                roller.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0), axis);
+                roller.castShadow = true;
+                roller.receiveShadow = true;
+                scene.add(roller);
+            });
+
+            // 4. 起重机 (The Crane)
+            createCrane();
+
+            // 5. 操作员 (The Operator)
+            createOperator();
+
+            // 6. 风车
+            createWindmill();
+
+            // 7. 货物
+            createCrates();
+
+            // 8. 粒子
+            createParticles();
+        }
+
+        function createCrane() {
+            const group = new THREE.Group();
+            group.position.set(2.5, 0, -2.5); // 稍微往后挪一点，确保不挡住传送带
+            scene.add(group);
+            factory.crane.group = group;
+
+            // 石头基座 (加大)
+            const baseGeo = new THREE.CylinderGeometry(1.5, 1.8, 1.2, 8);
+            const baseMesh = new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({color: config.colors.stone}));
+            baseMesh.position.y = 0.6;
+            baseMesh.receiveShadow = true;
+            baseMesh.castShadow = true;
+            group.add(baseMesh);
+
+            // 主杆 (加粗，颜色加深)
+            const poleGroup = new THREE.Group();
+            poleGroup.position.y = 1.2;
+            group.add(poleGroup);
+
+            const poleGeo = new THREE.BoxGeometry(0.6, 5, 0.6);
+            const poleMat = new THREE.MeshStandardMaterial({color: config.colors.woodDark});
+            const pole = new THREE.Mesh(poleGeo, poleMat);
+            pole.position.y = 2.5;
+            pole.castShadow = true;
+            poleGroup.add(pole);
+
+            // 摇臂 (Arm)
+            const armGroup = new THREE.Group();
+            armGroup.position.y = 4.5; // 杆顶
+            poleGroup.add(armGroup);
+            factory.crane.arm = armGroup;
+
+            // 臂身
+            const armGeo = new THREE.BoxGeometry(5.5, 0.4, 0.4);
+            armGeo.translate(2.0, 0, 0); // 支点偏移
+            const armMesh = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({color: config.colors.woodLight}));
+            armMesh.castShadow = true;
+            armGroup.add(armMesh);
+
+            // 配重块
+            const weightGeo = new THREE.BoxGeometry(1, 1, 1);
+            const weight = new THREE.Mesh(weightGeo, new THREE.MeshStandardMaterial({color: config.colors.stone}));
+            weight.position.set(-1.0, 0, 0);
+            armGroup.add(weight);
+
+            // 绳索
+            const ropeGeo = new THREE.CylinderGeometry(0.03, 0.03, 1);
+            ropeGeo.translate(0, -0.5, 0);
+            const ropeMesh = new THREE.Mesh(ropeGeo, new THREE.MeshStandardMaterial({color: 0xEEEEEE}));
+            ropeMesh.position.x = 4.5; // 臂尖
+            armGroup.add(ropeMesh);
+            factory.crane.rope = ropeMesh;
+
+            // 爪子
+            const clawGroup = new THREE.Group();
+            clawGroup.position.y = -1;
+            ropeMesh.add(clawGroup);
+            factory.crane.claw = clawGroup;
+
+            const clawGeo = new THREE.BoxGeometry(0.15, 0.5, 0.15);
+            const clawMat = new THREE.MeshStandardMaterial({color: 0x333333});
+            
+            const c1 = new THREE.Mesh(clawGeo, clawMat);
+            c1.position.set(-0.25, -0.2, 0); c1.rotation.z = 0.3;
+            const c2 = new THREE.Mesh(clawGeo, clawMat);
+            c2.position.set(0.25, -0.2, 0); c2.rotation.z = -0.3;
+            const c3 = new THREE.Mesh(clawGeo, clawMat);
+            c3.position.set(0, -0.2, 0.25); c3.rotation.x = 0.3;
+            const c4 = new THREE.Mesh(clawGeo, clawMat);
+            c4.position.set(0, -0.2, -0.25); c4.rotation.x = -0.3;
+            
+            clawGroup.add(c1, c2, c3, c4);
+        }
+
+        function createOperator() {
+            // 在起重机旁边创建一个体素小人
+            const opGroup = new THREE.Group();
+            // 放在起重机基座旁边
+            opGroup.position.set(3.5, 0, -1.0); 
+            opGroup.rotation.y = -Math.PI / 4; // 面向机器
+            scene.add(opGroup);
+            factory.operator = opGroup;
+
+            // 材质
+            const skinMat = new THREE.MeshStandardMaterial({color: config.colors.skin});
+            const clothesMat = new THREE.MeshStandardMaterial({color: config.colors.blue});
+            const shirtMat = new THREE.MeshStandardMaterial({color: config.colors.shirt});
+            const hatMat = new THREE.MeshStandardMaterial({color: config.colors.yellow});
+
+            // 1. 腿
+            const legGeo = new THREE.BoxGeometry(0.25, 0.6, 0.25);
+            const leftLeg = new THREE.Mesh(legGeo, clothesMat);
+            leftLeg.position.set(-0.15, 0.3, 0);
+            const rightLeg = new THREE.Mesh(legGeo, clothesMat);
+            rightLeg.position.set(0.15, 0.3, 0);
+            opGroup.add(leftLeg, rightLeg);
+
+            // 2. 身体
+            const bodyGeo = new THREE.BoxGeometry(0.6, 0.7, 0.35);
+            const body = new THREE.Mesh(bodyGeo, shirtMat);
+            body.position.y = 0.95;
+            body.castShadow = true;
+            opGroup.add(body);
+
+            // 2.1 背带裤前胸
+            const bibGeo = new THREE.BoxGeometry(0.4, 0.4, 0.36);
+            const bib = new THREE.Mesh(bibGeo, clothesMat);
+            bib.position.y = 0.8;
+            opGroup.add(bib);
+
+            // 3. 头
+            const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const head = new THREE.Mesh(headGeo, skinMat);
+            head.position.y = 1.55;
+            head.castShadow = true;
+            opGroup.add(head);
+
+            // 4. 帽子
+            const hatBrimGeo = new THREE.BoxGeometry(0.8, 0.1, 0.8);
+            const hatTopGeo = new THREE.BoxGeometry(0.52, 0.3, 0.52);
+            const hatBrim = new THREE.Mesh(hatBrimGeo, hatMat);
+            hatBrim.position.y = 1.8;
+            const hatTop = new THREE.Mesh(hatTopGeo, hatMat);
+            hatTop.position.y = 1.95;
+            opGroup.add(hatBrim, hatTop);
+
+            // 5. 手臂 (简单的盒子)
+            const armGeo = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+            const leftArm = new THREE.Mesh(armGeo, skinMat);
+            leftArm.position.set(-0.45, 1.1, 0);
+            const rightArm = new THREE.Mesh(armGeo, skinMat);
+            rightArm.position.set(0.45, 1.1, 0.1); // 右手举起一点
+            rightArm.rotation.x = -0.5; // 像是在操作拉杆
+            opGroup.add(leftArm, rightArm);
+            
+            // 简单的控制台
+            const consoleGeo = new THREE.BoxGeometry(0.8, 1.0, 0.5);
+            const consoleBox = new THREE.Mesh(consoleGeo, new THREE.MeshStandardMaterial({color: config.colors.woodDark}));
+            consoleBox.position.set(0, 0.5, 0.6); // 在人面前
+            opGroup.add(consoleBox);
+        }
+
+        function createWindmill() {
+            const group = new THREE.Group();
+            group.position.set(-8, 0, 5);
+            scene.add(group);
+
+            const towerGeo = new THREE.CylinderGeometry(1, 1.5, 5, 6);
+            const towerMesh = new THREE.Mesh(towerGeo, new THREE.MeshStandardMaterial({color: config.colors.woodPlank}));
+            towerMesh.position.y = 2.5;
+            towerMesh.castShadow = true;
+            group.add(towerMesh);
+
+            const hubGroup = new THREE.Group();
+            hubGroup.position.set(0, 4.5, 0.8);
+            hubGroup.rotation.x = -0.1;
+            group.add(hubGroup);
+            factory.windmillBlade = hubGroup;
+
+            const bladeGeo = new THREE.BoxGeometry(0.6, 4.5, 0.1);
+            const bladeMat = new THREE.MeshStandardMaterial({color: 0xEEEEEE});
+            
+            for(let i=0; i<4; i++) {
+                const b = new THREE.Mesh(bladeGeo, bladeMat);
+                b.position.y = 2.0;
+                const w = new THREE.Group();
+                w.rotation.z = i * Math.PI / 2;
+                w.add(b);
+                hubGroup.add(w);
+            }
+        }
+
+        function createCrates() {
+            const demos = [
+                { name: "Project: CHAT" },
+                { name: "Project: BLOG" },
+                { name: "Project: GAME" },
+            ];
+
+            const boxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+            const borderGeo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+            const borderMat = new THREE.MeshBasicMaterial({ color: config.colors.woodDark, wireframe: true });
+            
+            demos.forEach((demo, index) => {
+                const group = new THREE.Group();
+                
+                // 箱子
+                const mesh = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ color: config.colors.crate }));
+                mesh.castShadow = true;
+                group.add(mesh);
+                group.add(new THREE.Mesh(borderGeo, borderMat));
+
+                // 文字标签
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = "rgba(255,255,255,0.9)";
+                ctx.fillRect(0,0,256,128);
+                ctx.fillStyle = "#3E2723";
+                ctx.font = "bold 40px VT323";
+                ctx.textAlign = "center";
+                ctx.fillText(demo.name, 128, 75);
+                
+                const label = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1.6, 0.8),
+                    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, side: THREE.DoubleSide })
+                );
+                label.position.y = 1.2;
+                group.add(label);
+
+                scene.add(group);
+                factory.crates.push({ mesh: group, offset: index * 0.33 });
+            });
+        }
+
+        function createParticles() {
+            // 简单的白色方块粒子代替 Sprite，确保渲染
+            const geo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+            const mat = new THREE.MeshBasicMaterial({color: 0xFFCDD2, transparent: true, opacity: 0.8});
+            
+            for(let i=0; i<15; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(-8, 5, 5);
+                scene.add(mesh);
+                factory.particles.push({
+                    mesh: mesh,
+                    speed: 0.03 + Math.random() * 0.03,
+                    offset: Math.random() * 10
+                });
+            }
+        }
+
+        // --- 动画 ---
+        
+        const timelineState = { beltProgress: 0 };
+
+        function setupScrollAnimation() {
+            gsap.to(timelineState, {
+                beltProgress: 2.0, // 滚动距离
+                ease: "none",
+                scrollTrigger: {
+                    trigger: "#scroll-dummy",
+                    start: "top top",
+                    end: "bottom bottom",
+                    scrub: 0.5, // 稍微延迟一点，增加平滑感
+                }
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            // 1. 风车旋转
+            if(factory.windmillBlade) factory.windmillBlade.rotation.z -= 0.02;
+
+            // 2. 粒子上升
+            factory.particles.forEach(p => {
+                p.mesh.position.y += p.speed;
+                p.mesh.rotation.x += 0.05;
+                p.mesh.rotation.y += 0.05;
+                p.mesh.material.opacity = 1 - ((p.mesh.position.y - 5) / 3);
+                
+                if(p.mesh.position.y > 8) {
+                    p.mesh.position.y = 5;
+                    p.mesh.material.opacity = 0.8;
+                }
+            });
+
+            // 3. 小人动画 (Idle)
+            if(factory.operator) {
+                // 身体轻微呼吸起伏
+                factory.operator.scale.y = 1 + Math.sin(time * 3) * 0.02;
+                // 头左右看
+                factory.operator.children[3].rotation.y = Math.sin(time * 1.5) * 0.1; // Head
+                factory.operator.children[4].rotation.y = Math.sin(time * 1.5) * 0.1; // Hat
+            }
+
+            updateFactoryLogic(time);
+            composer.render();
+        }
+
+        function updateFactoryLogic(time) {
+            const CRANE_POINT = 0.5;
+
+            factory.crates.forEach(crate => {
+                const totalProgress = crate.offset + timelineState.beltProgress;
+                const t = totalProgress % 1.0;
+                
+                // 曲线位置
+                const curvePos = factory.beltCurve.getPointAt(t);
+                const tangent = factory.beltCurve.getTangentAt(t);
+
+                // 核心交互：抓取检测
+                // 计算当前箱子是否在起重机互动范围内
+                // 我们使用 totalProgress 的线性值来判断，这样更精准
+                // 假设互动发生在每一圈的 0.45 到 0.55 之间
+                
+                // 将进度归一化到当前圈的相对位置
+                const currentCycleT = t; 
+                const distFromCenter = currentCycleT - CRANE_POINT;
+                
+                // 定义抓取窗口 (例如 -0.05 到 +0.05)
+                const GRAB_WINDOW = 0.08;
+                
+                let finalPos = new THREE.Vector3();
+                
+                if (Math.abs(distFromCenter) < GRAB_WINDOW) {
+                    // --- 抓取动画 ---
+                    
+                    // 将 [-0.08, 0.08] 映射到 [0, 1] 的动画进度，再映射回抛物线
+                    // -0.08 -> 0 (开始)
+                    // 0 -> 0.5 (顶点)
+                    // 0.08 -> 1 (结束)
+                    const animProgress = (distFromCenter + GRAB_WINDOW) / (GRAB_WINDOW * 2);
+                    
+                    // 抛物线高度 (0 -> 1 -> 0)
+                    const lift = Math.sin(animProgress * Math.PI); 
+                    
+                    // 位置插值：从传送带位置过渡到起重机正下方悬空位置
+                    const beltPosAtCenter = factory.beltCurve.getPointAt(CRANE_POINT);
+                    
+                    // X/Z 轴稍微滞后一点，模拟被抓停
+                    finalPos.copy(beltPosAtCenter);
+                    finalPos.y += lift * 3.5; // 举高
+                    
+                    // 旋转：举起时面向屏幕
+                    if(lift > 0.5) {
+                        crate.mesh.lookAt(camera.position);
+                    } else {
+                        crate.mesh.lookAt(finalPos.clone().add(tangent));
+                    }
+
+                    // --- 驱动起重机 ---
+                    // 绳子跟随
+                    const ropeLen = 4.5 - finalPos.y; // 简单计算
+                    if(ropeLen > 0) {
+                        factory.crane.rope.scale.y = Math.max(0.1, ropeLen);
+                        factory.crane.rope.position.y = 4.5 - (ropeLen / 2);
+                        factory.crane.claw.position.y = -0.5;
+                        
+                        // 机械臂稍微下压一点
+                        factory.crane.arm.rotation.z = -lift * 0.1;
+                    }
+                    
+                    // 操作员动作：举手
+                    if(factory.operator) {
+                        // 右手举高
+                        factory.operator.children[6].rotation.x = -0.5 - lift; 
+                    }
+
+                } else {
+                    // --- 正常传送 ---
+                    finalPos.copy(curvePos);
+                    crate.mesh.lookAt(finalPos.clone().add(tangent));
+                    
+                    // 恢复起重机默认状态 (缓慢)
+                    if(factory.crane.rope) {
+                        factory.crane.rope.scale.y = THREE.MathUtils.lerp(factory.crane.rope.scale.y, 1, 0.1);
+                        factory.crane.rope.position.y = THREE.MathUtils.lerp(factory.crane.rope.position.y, 4.0, 0.1);
+                        factory.crane.arm.rotation.z = THREE.MathUtils.lerp(factory.crane.arm.rotation.z, 0, 0.1);
+                    }
+                }
+
+                crate.mesh.position.copy(finalPos);
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(e) {
+            const cursor = document.getElementById('cursor');
+            if(cursor) {
+                // 简单的跟随，带一点点偏移让它不遮挡点击点
+                cursor.style.left = e.clientX + 'px';
+                cursor.style.top = e.clientY + 'px';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

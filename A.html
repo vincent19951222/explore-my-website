@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boluopets Explore - Pixel Valley</title>
+    <!-- 引入像素字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 基础样式 --- */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #87CEEB;
+            overflow-x: hidden;
+            font-family: 'VT323', monospace;
+            scroll-behavior: smooth; 
+        }
+
+        /* 像素光标 */
+        body {
+            cursor: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABlBMVEUAAAD///+l2Z/dAAAAAnRSTlP/AOW3MEoAAAAdSURBVRjSZWAAAzYgYAAjKiUcAkwI146sDq8yAAAKHABzsF2X1AAAAABJRU5ErkJggg=='), auto;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* 增加页面长度以容纳更多项目 */
+        .scroll-spacer {
+            height: 1200vh; 
+            width: 1px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* --- UI 设计 --- */
+        #ui {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            color: #5d4037;
+            text-shadow: 2px 2px 0px #ffffff;
+            pointer-events: none;
+        }
+
+        h1 { font-size: 3rem; margin: 0; line-height: 1; }
+        p.subtitle { font-size: 1.5rem; margin-top: 5px; color: #2c5e1a; }
+
+        /* --- 侧边导航栏 (Quest Log 风格) --- */
+        #sidebar {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 180px;
+            background-color: #e8c170; /* 浅木色 */
+            border: 4px solid #a0522d; /* 深木色 */
+            box-shadow: 
+                -4px 0 0 0 #5d4037, 
+                4px 0 0 0 #5d4037, 
+                0 -4px 0 0 #5d4037, 
+                0 4px 0 0 #5d4037, /* 像素描边模拟 */
+                8px 8px 0 rgba(0,0,0,0.2);
+            padding: 10px;
+            z-index: 20;
+            font-family: 'VT323', monospace;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        #sidebar::before, #sidebar::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #5d4037;
+            top: 6px;
+        }
+        #sidebar::before { left: 6px; }
+        #sidebar::after { right: 6px; }
+
+        .nav-title {
+            text-align: center;
+            font-size: 1.4rem;
+            color: #5d4037;
+            border-bottom: 2px dashed #a0522d;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .nav-item {
+            padding: 5px 8px;
+            cursor: pointer;
+            color: #5d4037;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+            position: relative;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .nav-item:hover {
+            background-color: #8FDE5D; 
+            color: #1a3c0b;
+            padding-left: 15px;
+        }
+        
+        .nav-item:hover::before {
+            content: '>';
+            position: absolute;
+            left: 5px;
+        }
+
+        /* --- Loading & Hint --- */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #87CEEB;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99;
+            transition: opacity 0.5s;
+        }
+        .loader-text { font-size: 2rem; color: white; animation: bounce 1s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-10px); } }
+
+        .scroll-hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.5rem;
+            color: white;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+            animation: blink 2s infinite;
+            z-index: 10;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+    <div id="loader"><div class="loader-text">Building Terrain...</div></div>
+    
+    <div id="ui">
+        <h1>Boluopets</h1>
+        <p class="subtitle">Valley Explore</p>
+    </div>
+
+    <div id="sidebar">
+        <div class="nav-title">QUEST LOG</div>
+    </div>
+
+    <div class="scroll-hint">SCROLL TO EXPLORE ▼</div>
+
+    <div id="canvas-container"></div>
+    <div class="scroll-spacer"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "gsap": "https://unpkg.com/gsap@3.12.5/index.js",
+                "gsap/ScrollTrigger": "https://unpkg.com/gsap@3.12.5/ScrollTrigger.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import gsap from 'gsap';
+        import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+        gsap.registerPlugin(ScrollTrigger);
+
+        const CONFIG = {
+            voxelSize: 0.4, 
+            fogNear: 20,
+            fogFar: 90
+        };
+
+        const COLORS = {
+            sky: 0x87CEEB,
+            grassLight: 0x8FDE5D,
+            grassDark: 0x76c75b,
+            dirt: 0x8b5a2b,
+            wood: 0xa0522d,
+            water: 0x4fa4b8,
+            leafLight: 0x4e9e46,
+            leafDark: 0x2c5e1a,
+            cloud: 0xffffff
+        };
+
+        const PROJECTS = [
+            { id: 1, title: "AI Chat", desc: "Talk to friends" },
+            { id: 2, title: "Pixel Farm", desc: "Grow seeds" },
+            { id: 3, title: "Marketplace", desc: "Trade items" },
+            { id: 4, title: "Voxel Editor", desc: "Build world" },
+            { id: 5, title: "Music Box", desc: "Lo-Fi Beats" },
+            { id: 6, title: "Mini Games", desc: "Arcade fun" },
+            { id: 7, title: "Community", desc: "Join guild" },
+            { id: 8, title: "About Us", desc: "The Team" }
+        ];
+
+        let scene, camera, renderer, composer;
+        let cameraPath;
+        let signs = [];
+        let animals = [];
+        let trees = [];
+        let clouds = [];
+        let time = 0;
+        const clock = new THREE.Clock();
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        init();
+        initSidebar();
+        animate();
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(COLORS.sky);
+            scene.fog = new THREE.Fog(COLORS.sky, CONFIG.fogNear, CONFIG.fogFar);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            const hemiLight = new THREE.HemisphereLight(0xffffff, COLORS.grassDark, 0.6);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.2);
+            dirLight.position.set(50, 80, 50);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048; 
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 200;
+            const d = 60;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            dirLight.shadow.bias = -0.0005;
+            scene.add(dirLight);
+
+            createTerrainPath();
+            createDecorations();
+
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0.6;
+            bloomPass.strength = 0.3;
+            bloomPass.radius = 0.8;
+            
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('click', onPointerClick);
+
+            setTimeout(() => {
+                document.getElementById('loader').style.opacity = 0;
+                setTimeout(() => document.getElementById('loader').remove(), 500);
+            }, 800);
+        }
+
+        function initSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const totalScrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+
+            PROJECTS.forEach((proj, index) => {
+                const item = document.createElement('div');
+                item.className = 'nav-item';
+                item.innerText = proj.title; 
+                
+                item.onclick = () => {
+                    const t = (index + 1) / (PROJECTS.length + 1);
+                    const targetScroll = t * totalScrollHeight;
+
+                    window.scrollTo({
+                        top: targetScroll,
+                        behavior: 'smooth'
+                    });
+                };
+                sidebar.appendChild(item);
+            });
+        }
+
+        function createTerrainPath() {
+            const points = [
+                new THREE.Vector3(-5, 40, -60),
+                new THREE.Vector3(10, 32, -20),
+                new THREE.Vector3(-12, 22, 20),
+                new THREE.Vector3(12, 12, 60),
+                new THREE.Vector3(-5, 6, 100),
+                new THREE.Vector3(5, 2, 140)
+            ];
+            
+            cameraPath = new THREE.CatmullRomCurve3(points);
+            
+            // 获取路径物理长度，用于精确计算采样步数
+            const pathLen = cameraPath.getLength();
+            const s = CONFIG.voxelSize;
+
+            const boxGeo = new THREE.BoxGeometry(s, s, s);
+            const grassMat = new THREE.MeshLambertMaterial({ color: COLORS.grassDark });
+            const dirtMat = new THREE.MeshLambertMaterial({ color: COLORS.dirt });
+            
+            // --- 核心优化 1：大幅增加容量 ---
+            // 假设我们现在填充地层，需要 3-4 倍的数量
+            const grassCount = 40000; 
+            const dirtCount = 120000; // 泥土要更多，因为要填充地底
+            
+            const grassMesh = new THREE.InstancedMesh(boxGeo, grassMat, grassCount);
+            grassMesh.receiveShadow = true;
+            grassMesh.castShadow = true;
+            
+            const dirtMesh = new THREE.InstancedMesh(boxGeo, dirtMat, dirtCount);
+            dirtMesh.receiveShadow = true;
+
+            const dummy = new THREE.Object3D();
+            let grassIdx = 0;
+            let dirtIdx = 0;
+            
+            // --- 核心优化 2：自适应高密度采样 ---
+            // 确保沿路径每移动一步，距离都不超过体素大小的一半 (Over-sampling)
+            // 这样转弯处才不会有缝隙
+            const steps = Math.ceil(pathLen / (s * 0.5)); 
+
+            // 用于去重的 Set，避免在同一个 grid 坐标重复生成
+            const occupied = new Set();
+            const key = (x, y, z) => `${x},${y},${z}`;
+
+            for (let i = 0; i < steps; i++) {
+                const t = i / steps;
+                const pos = cameraPath.getPointAt(t);
+                const tangent = cameraPath.getTangentAt(t);
+                const normal = new THREE.Vector3(0, 1, 0);
+                const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+                // 核心优化 3：确保横向扫描也密不透风
+                // 扫描宽度从 -18 到 18
+                for (let xOffset = -18; xOffset <= 18; xOffset += s) {
+                    
+                    // 计算世界坐标
+                    // 增加一点点 noise，让边缘不是笔直的，但中间要填实
+                    let noise = 0;
+                    if (Math.abs(xOffset) > 3) noise = (Math.random() - 0.5) * 0.3;
+                    
+                    const worldPos = pos.clone().add(binormal.clone().multiplyScalar(xOffset + noise));
+                    
+                    // 计算高度 (Y)
+                    const dist = Math.abs(xOffset);
+                    let heightOffset = 0;
+                    
+                    // 造地形：路中间低，两边高
+                    if (dist > 3) {
+                        heightOffset += (dist - 3) * 0.6; 
+                        heightOffset += (Math.random() * 0.5); // 表面轻微不平整
+                    }
+                    
+                    worldPos.y += heightOffset;
+
+                    // --- 核心优化 4：Grid 量化 (Snapping) ---
+                    const gx = Math.floor(worldPos.x / s);
+                    const gy = Math.floor(worldPos.y / s);
+                    const gz = Math.floor(worldPos.z / s);
+                    
+                    // 检查是否已生成，避免重叠浪费性能
+                    const k = key(gx, gy, gz);
+                    if (occupied.has(k)) continue;
+                    occupied.add(k);
+
+                    // 决定是路面还是草地
+                    const isRoad = dist < 2.5;
+                    
+                    // 最终渲染坐标
+                    const rx = gx * s;
+                    const ry = gy * s;
+                    const rz = gz * s;
+
+                    // --- 核心优化 5：垂直填充 (Volume Filling) ---
+                    // 不仅仅生成表面，往下多生成几层，填补空隙
+                    const depth = isRoad ? 3 : 5; // 泥土深度：路面3层，山坡5层
+
+                    for(let d = 0; d < depth; d++) {
+                        dummy.position.set(rx, ry - (d * s), rz);
+                        // 微调 Scale 1.02 消除缝隙 (Bleeding)
+                        dummy.scale.set(1.05, 1.05, 1.05); 
+                        dummy.updateMatrix();
+
+                        if (d === 0) {
+                            // 表面层
+                            if (isRoad) {
+                                if (dirtIdx < dirtCount) dirtMesh.setMatrixAt(dirtIdx++, dummy.matrix);
+                            } else {
+                                // 随机草色
+                                const colorVar = new THREE.Color(COLORS.grassDark);
+                                if (Math.random() > 0.6) colorVar.setHex(COLORS.grassLight);
+                                grassMesh.setColorAt(grassIdx, colorVar);
+                                
+                                if (grassIdx < grassCount) grassMesh.setMatrixAt(grassIdx++, dummy.matrix);
+                                
+                                // 装饰物
+                                if (d===0 && Math.random() < 0.005 && dist > 4) {
+                                    createTree(rx, ry + s, rz);
+                                }
+                                if (d===0 && Math.random() < 0.002 && dist < 6 && dist > 3) {
+                                    createAnimal(rx, ry + s, rz);
+                                }
+                            }
+                        } else {
+                            // 地下层全是泥土
+                            if (dirtIdx < dirtCount) dirtMesh.setMatrixAt(dirtIdx++, dummy.matrix);
+                        }
+                    }
+                }
+            }
+
+            scene.add(grassMesh);
+            scene.add(dirtMesh);
+
+            setupScrollAnimation();
+        }
+
+        function createTree(x, y, z) {
+            const s = CONFIG.voxelSize; 
+            const treeGroup = new THREE.Group();
+            treeGroup.position.set(x, y, z);
+
+            const trunkGeo = new THREE.BoxGeometry(s*2, s*5, s*2);
+            const trunkMat = new THREE.MeshLambertMaterial({ color: COLORS.wood });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = s * 2.5;
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+
+            const leavesGroup = new THREE.Group();
+            const leafMat = new THREE.MeshLambertMaterial({ color: COLORS.leafDark });
+            
+            const layers = [
+                { w: 8, y: 5 },
+                { w: 6, y: 7 },
+                { w: 4, y: 8.5 },
+                { w: 2, y: 9.5 }
+            ];
+
+            layers.forEach(layer => {
+                const mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(layer.w * s, s * 2, layer.w * s), 
+                    leafMat
+                );
+                mesh.position.y = layer.y * s;
+                mesh.castShadow = true;
+                leavesGroup.add(mesh);
+            });
+
+            treeGroup.add(leavesGroup);
+            scene.add(treeGroup);
+            trees.push({ group: leavesGroup, offset: Math.random() * 10 });
+        }
+
+        function createDecorations() {
+            PROJECTS.forEach((proj, index) => {
+                const t = (index + 1) / (PROJECTS.length + 1);
+                const point = cameraPath.getPointAt(t);
+                const tangent = cameraPath.getTangentAt(t);
+                const normal = new THREE.Vector3(0, 1, 0);
+                const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+                const side = index % 2 === 0 ? 4 : -4;
+                const pos = point.clone().add(binormal.multiplyScalar(side));
+                pos.y += 2; 
+
+                createSignboard(pos.x, pos.y, pos.z, proj);
+            });
+
+            for(let i=0; i<15; i++) createCloud();
+        }
+
+        function createSignboard(x, y, z, projectData) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+            group.lookAt(x, y, z+10); 
+
+            const postGeo = new THREE.BoxGeometry(0.5, 4, 0.5);
+            const woodMat = new THREE.MeshLambertMaterial({ color: COLORS.wood });
+            const post = new THREE.Mesh(postGeo, woodMat);
+            post.position.y = 0;
+            post.castShadow = true;
+            group.add(post);
+
+            const boardGeo = new THREE.BoxGeometry(3.5, 2.5, 0.2);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 300; 
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#e8c170'; 
+            ctx.fillRect(0,0, 512, 300);
+            
+            ctx.strokeStyle = '#a0522d';
+            ctx.lineWidth = 15;
+            ctx.strokeRect(10,10,492,280);
+            
+            ctx.fillStyle = '#5d4037';
+            ctx.fillRect(20, 20, 20, 20);
+            ctx.fillRect(472, 20, 20, 20);
+            ctx.fillRect(20, 260, 20, 20);
+            ctx.fillRect(472, 260, 20, 20);
+
+            ctx.font = '80px "VT323", monospace';
+            ctx.fillStyle = '#5d4037';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(projectData.title, 256, 110);
+            
+            ctx.font = '45px "VT323", monospace';
+            ctx.fillStyle = '#2c5e1a';
+            ctx.fillText(projectData.desc, 256, 200);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.LinearFilter;
+            
+            const boardMat = new THREE.MeshBasicMaterial({ map: texture });
+            const board = new THREE.Mesh(boardGeo, boardMat);
+            board.position.y = 1.5;
+            group.add(board);
+
+            group.userData = { isSign: true, id: projectData.id, title: projectData.title };
+            scene.add(group);
+            signs.push(group);
+        }
+
+        function createAnimal(x, y, z) {
+            const type = Math.random() > 0.5 ? 'chicken' : 'pig';
+            const color = type === 'chicken' ? 0xffffff : 0xffb6c1;
+            const s = CONFIG.voxelSize; 
+            const scale = type === 'chicken' ? s * 1.5 : s * 2.5;
+
+            const geo = new THREE.BoxGeometry(scale, scale, scale);
+            const mat = new THREE.MeshLambertMaterial({ color: color });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+
+            const beakGeo = new THREE.BoxGeometry(s*0.5, s*0.5, s*0.5);
+            const beakMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
+            const beak = new THREE.Mesh(beakGeo, beakMat);
+            beak.position.set(0, 0, scale/2 + 0.02);
+            mesh.add(beak);
+
+            scene.add(mesh);
+
+            animals.push({
+                mesh: mesh,
+                baseY: y,
+                offset: Math.random() * 100,
+                speed: 3 + Math.random() * 2
+            });
+        }
+
+        function createCloud() {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshBasicMaterial({ color: COLORS.cloud, opacity: 0.8, transparent: true });
+            const s = 1.5; 
+            const geo = new THREE.BoxGeometry(s, s, s);
+            
+            const blocks = 4 + Math.floor(Math.random() * 4);
+            for(let i=0; i<blocks; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(
+                    (Math.random() - 0.5) * 4,
+                    (Math.random() - 0.5) * 1,
+                    (Math.random() - 0.5) * 2
+                );
+                group.add(mesh);
+            }
+
+            group.position.set(
+                (Math.random() - 0.5) * 120,
+                35 + Math.random() * 15,
+                (Math.random() - 0.5) * 150
+            );
+
+            scene.add(group);
+            clouds.push({ group: group, speed: 0.2 + Math.random() * 0.3 });
+        }
+
+        function setupScrollAnimation() {
+            ScrollTrigger.create({
+                trigger: ".scroll-spacer",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 1.5,
+                onUpdate: (self) => {
+                    const t = self.progress * 0.98;
+                    const camPos = cameraPath.getPointAt(t);
+                    const lookAtPos = cameraPath.getPointAt(Math.min(t + 0.04, 1));
+
+                    camera.position.copy(camPos).add(new THREE.Vector3(0, 3, 0));
+                    camera.lookAt(lookAtPos);
+
+                    signs.forEach(sign => {
+                        const dist = sign.position.distanceTo(camera.position);
+                        if (dist < 15) {
+                            sign.lookAt(camera.position.x, sign.position.y, camera.position.z);
+                        }
+                    });
+                }
+            });
+        }
+
+        function onPointerMove(event) {
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onPointerClick(event) {
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                let target = intersects[0].object;
+                while(target.parent && target.parent !== scene) {
+                    if (target.userData && target.userData.isSign) {
+                        alert(`Entering Demo: ${target.userData.title}`);
+                        break;
+                    }
+                    target = target.parent;
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            time += delta;
+
+            animals.forEach(anim => {
+                const jump = Math.abs(Math.sin(time * anim.speed + anim.offset)) * 0.5;
+                anim.mesh.position.y = anim.baseY + jump;
+                anim.mesh.rotation.y += delta * 0.5;
+            });
+
+            trees.forEach(tree => {
+                const sway = Math.sin(time * 1.5 + tree.offset) * 0.05;
+                tree.group.rotation.z = sway;
+                tree.group.rotation.x = sway * 0.5;
+            });
+
+            clouds.forEach(cloud => {
+                cloud.group.position.x += delta * cloud.speed;
+                if(cloud.group.position.x > 60) cloud.group.position.x = -60;
+            });
+
+            composer.render();
+        }
+    </script>
+</body>
+</html>

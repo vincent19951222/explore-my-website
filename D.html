@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boluopets: Ocean Archipelago</title>
+    
+    <!-- 引入像素字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        /* --- 1. 全局设置 --- */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #40E0D0; /* Ocean fallback color */
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* --- 2. 3D 场景层 --- */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            transition: filter 0.8s ease; /* 用于背景模糊过渡 */
+        }
+
+        /* 当处于 RPG 对话模式时，3D 场景变模糊 */
+        #canvas-container.blurred {
+            filter: blur(8px) brightness(0.7);
+        }
+
+        /* 鼠标样式控制 */
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        .cursor-grab {
+            cursor: grab;
+        }
+
+        /* --- 3. UI 交互层 --- */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* 默认不阻挡 3D 操作 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* 对话框位于底部 */
+            padding-bottom: 50px;
+        }
+
+        /* --- 4. RPG 对话框 --- */
+        #rpg-dialog {
+            background: #f4e4bc; /* 米黄色复古纸张感 */
+            border: 4px solid #4a3c31; /* 深褐色边框 */
+            box-shadow: 
+                inset 4px 4px 0px rgba(255,255,255,0.5),
+                inset -4px -4px 0px rgba(0,0,0,0.1),
+                10px 10px 0px rgba(0,0,0,0.3); /* 像素投影 */
+            width: 90%;
+            max-width: 800px;
+            height: 200px;
+            display: flex;
+            padding: 20px;
+            box-sizing: border-box;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto; /* 允许点击按钮 */
+            font-family: 'VT323', monospace; /* 内容使用更易读的像素字体 */
+            color: #4a3c31;
+        }
+
+        #rpg-dialog.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 头像区域 */
+        .dialog-avatar {
+            width: 140px;
+            height: 140px;
+            border: 4px solid #4a3c31;
+            background: #fff;
+            margin-right: 20px;
+            flex-shrink: 0;
+            image-rendering: pixelated;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .dialog-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 文本区域 */
+        .dialog-content {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .dialog-content h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            margin: 0 0 15px 0;
+            color: #d64541; /* 强调色 */
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .dialog-content p {
+            font-size: 24px;
+            line-height: 1.4;
+            margin: 0;
+            min-height: 80px;
+        }
+
+        /* 打字机光标 */
+        .cursor::after {
+            content: '▋';
+            animation: blink 1s step-end infinite;
+            margin-left: 2px;
+            color: #4a3c31;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 动作按钮区域 */
+        .dialog-action {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            margin-left: 20px;
+            min-width: 100px;
+        }
+
+        .btn-pixel {
+            background: #d64541;
+            border: 2px solid #4a3c31;
+            color: white;
+            padding: 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            text-align: center;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn-pixel:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        /* 简单的 HUD - 提示用户 */
+        #hud-hint {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            opacity: 0.8;
+            font-size: 12px;
+            z-index: 5;
+        }
+
+        /* 关闭用的遮罩层 */
+        #click-outside-catcher {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9;
+            display: none;
+            pointer-events: auto; 
+            cursor: zoom-out; 
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+    
+    <!-- Top HUD -->
+    <div id="hud-hint">CLICK AN ISLAND TO EXPLORE</div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <!-- 透明遮罩，用于点击背景关闭对话框 -->
+        <div id="click-outside-catcher"></div>
+
+        <!-- RPG Style Dialog -->
+        <div id="rpg-dialog">
+            <div class="dialog-avatar">
+                <img id="dialog-img" src="" alt="Project Preview">
+            </div>
+            <div class="dialog-content">
+                <h2 id="dialog-title">Project Title</h2>
+                <p><span id="dialog-text"></span><span class="cursor"></span></p>
+            </div>
+            <div class="dialog-action">
+                <a id="dialog-link" href="#" target="_blank" class="btn-pixel">ENTER ></a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. DATA: The Islands ---
+        // 更新为 5 个岛屿，包含类型定义以便生成特定地标
+        const islandData = [
+            {
+                id: 0,
+                type: 'lighthouse',
+                title: "Beacon Tower",
+                desc: "The guiding light of the Boluopets ecosystem. Governance starts here.",
+                color: 0xFF6B6B, 
+                image: "https://placehold.co/150x150/FF6B6B/FFFFFF?text=TOWER",
+                link: "#"
+            },
+            {
+                id: 1,
+                type: 'palm',
+                title: "Oasis Grove",
+                desc: "A giant ancient palm tree offering shade for weary voxel travelers.",
+                color: 0x4ECDC4, 
+                image: "https://placehold.co/150x150/4ECDC4/FFFFFF?text=OASIS",
+                link: "#"
+            },
+            {
+                id: 2,
+                type: 'cabin',
+                title: "Builder's Cabin",
+                desc: "A cozy workshop where new pets and items are crafted daily.",
+                color: 0xFFD93D, 
+                image: "https://placehold.co/150x150/FFD93D/FFFFFF?text=CABIN",
+                link: "#"
+            },
+            {
+                id: 3,
+                type: 'windmill',
+                title: "Windy Mill",
+                desc: "Harnessing the ocean breeze to power the decentralized network.",
+                color: 0x95A5A6, 
+                image: "https://placehold.co/150x150/95A5A6/FFFFFF?text=WIND",
+                link: "#"
+            },
+            {
+                id: 4,
+                type: 'ruins',
+                title: "Ancient Ruins",
+                desc: "Mysterious stone pillars from a forgotten era. What secrets do they hold?",
+                color: 0x9B59B6, 
+                image: "https://placehold.co/150x150/9B59B6/FFFFFF?text=RUINS",
+                link: "#"
+            }
+        ];
+
+        // --- 2. SETUP THREE.JS SCENE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); 
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 90); 
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const INITIAL_CAM_POS = { x: 0, y: 30, z: 45 }; // 稍微拉远一点以适应更多岛屿
+        camera.position.set(INITIAL_CAM_POS.x, INITIAL_CAM_POS.y, INITIAL_CAM_POS.z);
+        camera.lookAt(0, 0, 0);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
+
+        // --- 3. CREATE THE WORLD ---
+
+        // A. The Ocean
+        const oceanGeometry = new THREE.PlaneGeometry(120, 120, 50, 50);
+        const posAttribute = oceanGeometry.attributes.position;
+        for (let i = 0; i < posAttribute.count; i++) {
+            const z = posAttribute.getZ(i);
+            posAttribute.setZ(i, z + (Math.random() - 0.5) * 1.5); 
+        }
+        oceanGeometry.computeVertexNormals();
+        const oceanMaterial = new THREE.MeshPhongMaterial({
+            color: 0x40E0D0,
+            shininess: 80,
+            flatShading: true,
+            transparent: true,
+            opacity: 0.9
+        });
+        const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+        ocean.rotation.x = -Math.PI / 2;
+        ocean.receiveShadow = true;
+        scene.add(ocean);
+
+        // B. Helper Generators for Landmarks
+        
+        function createBox(w, h, d, color, x, y, z) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshStandardMaterial({ color: color, flatShading: true });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            return mesh;
+        }
+
+        function buildLighthouse() {
+            const group = new THREE.Group();
+            // Base Stripes
+            group.add(createBox(1.5, 1, 1.5, 0xFFFFFF, 0, 0.5, 0));
+            group.add(createBox(1.3, 1, 1.3, 0xD64541, 0, 1.5, 0));
+            group.add(createBox(1.1, 1, 1.1, 0xFFFFFF, 0, 2.5, 0));
+            group.add(createBox(0.9, 1, 0.9, 0xD64541, 0, 3.5, 0));
+            // Top Lamp
+            const lampGeo = new THREE.BoxGeometry(1.2, 0.8, 1.2);
+            const lampMat = new THREE.MeshStandardMaterial({ color: 0xFFD93D, emissive: 0xFFD700, emissiveIntensity: 0.5 });
+            const lamp = new THREE.Mesh(lampGeo, lampMat);
+            lamp.position.y = 4.4;
+            group.add(lamp);
+            return group;
+        }
+
+        function buildPalmTree() {
+            const group = new THREE.Group();
+            // Curved Trunk (simulated by stacked boxes with offset)
+            group.add(createBox(0.6, 1.2, 0.6, 0x8B4513, 0, 0.6, 0));
+            group.add(createBox(0.5, 1.2, 0.5, 0x8B4513, 0.2, 1.6, 0));
+            group.add(createBox(0.4, 1.2, 0.4, 0x8B4513, 0.5, 2.6, 0));
+            
+            // Leaves
+            const leavesGroup = new THREE.Group();
+            leavesGroup.position.set(0.5, 3.2, 0);
+            const leafGeo = new THREE.BoxGeometry(2.5, 0.2, 0.8);
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
+            
+            [0, 60, 120, 180, 240, 300].forEach(deg => {
+                const leaf = new THREE.Mesh(leafGeo, leafMat);
+                leaf.rotation.y = deg * Math.PI / 180;
+                leaf.rotation.z = Math.PI / 6; // Droop slightly
+                leavesGroup.add(leaf);
+            });
+            group.add(leavesGroup);
+            return group;
+        }
+
+        function buildCabin() {
+            const group = new THREE.Group();
+            // Walls
+            group.add(createBox(2.2, 1.5, 1.8, 0x8B4513, 0, 0.75, 0));
+            // Door
+            group.add(createBox(0.6, 1, 0.1, 0x4a3c31, 0, 0.5, 0.9));
+            // Roof (Prism)
+            const roofGeo = new THREE.ConeGeometry(2, 1, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xA0522D, flatShading: true });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.y = 2.0;
+            roof.rotation.y = Math.PI / 4;
+            roof.scale.z = 0.8; 
+            group.add(roof);
+            // Chimney
+            group.add(createBox(0.4, 0.8, 0.4, 0x555555, 0.8, 2.0, -0.4));
+            return group;
+        }
+
+        function buildWindmill() {
+            const group = new THREE.Group();
+            // Body
+            group.add(createBox(1.5, 2, 1.5, 0xEEEEEE, 0, 1, 0));
+            // Roof
+            const roofGeo = new THREE.ConeGeometry(1.2, 1, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xD35400 });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.y = 2.5;
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
+
+            // Blades Group
+            const blades = new THREE.Group();
+            blades.position.set(0, 2, 0.8);
+            
+            const bladeGeo = new THREE.BoxGeometry(0.3, 3.5, 0.1);
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xF1C40F });
+            const b1 = new THREE.Mesh(bladeGeo, bladeMat);
+            const b2 = new THREE.Mesh(bladeGeo, bladeMat); b2.rotation.z = Math.PI / 2;
+            blades.add(b1);
+            blades.add(b2);
+            
+            group.add(blades);
+            
+            // Mark for animation
+            group.userData.animatable = true;
+            group.userData.blades = blades;
+            
+            return group;
+        }
+
+        function buildRuins() {
+            const group = new THREE.Group();
+            // Pillars
+            group.add(createBox(0.5, 2.5, 0.5, 0x95A5A6, -0.8, 1.25, -0.8));
+            group.add(createBox(0.5, 1.5, 0.5, 0x95A5A6, 0.8, 0.75, 0.8));
+            group.add(createBox(0.5, 0.5, 0.5, 0x95A5A6, -0.8, 0.25, 0.8)); // broken one
+            // Floating crystal
+            const crysGeo = new THREE.OctahedronGeometry(0.4);
+            const crysMat = new THREE.MeshStandardMaterial({ color: 0x9B59B6, emissive: 0x8E44AD, emissiveIntensity: 0.8 });
+            const crystal = new THREE.Mesh(crysGeo, crysMat);
+            crystal.position.set(0, 2, 0);
+            
+            // Floating animation for crystal
+            group.userData.animatable = true;
+            group.userData.crystal = crystal;
+            group.add(crystal);
+            
+            return group;
+        }
+
+        // C. Build the Archipelago
+        const islandsGroup = new THREE.Group();
+        scene.add(islandsGroup);
+        const islandsMeshArr = []; 
+        const animatables = []; // Store objects that need internal animation (windmill, etc)
+
+        // Configuration
+        const spreadRadius = 15;
+        const islandYBase = 1.0;
+
+        islandData.forEach((data, index) => {
+            const islandGroup = new THREE.Group();
+            
+            // 1. Base (Sand)
+            const size = 3.5;
+            const geo = new THREE.CylinderGeometry(size, size * 0.7, 2.5, 7); // 7 sides for voxel feel
+            const mat = new THREE.MeshStandardMaterial({ color: 0xe0cda9, flatShading: true });
+            const base = new THREE.Mesh(geo, mat);
+            base.castShadow = true;
+            base.receiveShadow = true;
+            base.userData = { ...data, isIsland: true, originalY: islandYBase };
+            islandGroup.add(base);
+
+            // 2. Grass Top
+            const grassGeo = new THREE.CylinderGeometry(size, size, 0.6, 7);
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x76c442, flatShading: true });
+            const grass = new THREE.Mesh(grassGeo, grassMat);
+            grass.position.y = 1.3; 
+            grass.receiveShadow = true;
+            islandGroup.add(grass);
+
+            // 3. Landmark
+            let landmark;
+            switch(data.type) {
+                case 'lighthouse': landmark = buildLighthouse(); break;
+                case 'palm': landmark = buildPalmTree(); break;
+                case 'cabin': landmark = buildCabin(); break;
+                case 'windmill': landmark = buildWindmill(); break;
+                case 'ruins': landmark = buildRuins(); break;
+                default: landmark = buildCabin();
+            }
+            
+            // Center the landmark on top
+            landmark.position.y = 1.6;
+            
+            if(landmark.userData.animatable) {
+                animatables.push(landmark);
+            }
+            islandGroup.add(landmark);
+
+            // 4. Decoration (Small rocks/bushes)
+            const decoGeo = new THREE.DodecahedronGeometry(0.3);
+            const decoMat = new THREE.MeshStandardMaterial({color: 0x555555});
+            const rock = new THREE.Mesh(decoGeo, decoMat);
+            rock.position.set(size*0.6, 1.8, 0);
+            islandGroup.add(rock);
+
+            // 5. Positioning
+            const angle = (index / islandData.length) * Math.PI * 2;
+            islandGroup.position.x = Math.cos(angle) * spreadRadius;
+            islandGroup.position.z = Math.sin(angle) * spreadRadius;
+            islandGroup.position.y = islandYBase;
+
+            // Store island position for bridges
+            data.position = islandGroup.position.clone();
+            
+            // Random float offset
+            islandGroup.userData.floatOffset = Math.random() * 100;
+            islandGroup.userData.baseY = islandYBase;
+
+            islandsGroup.add(islandGroup);
+            islandsMeshArr.push(base); 
+        });
+
+        // D. Create Rope Bridges
+        const bridgesGroup = new THREE.Group();
+        scene.add(bridgesGroup);
+
+        function createBridge(posA, posB) {
+            const bridge = new THREE.Group();
+            
+            // Calculate distance and direction
+            const dist = posA.distanceTo(posB);
+            const midPoint = posA.clone().add(posB).multiplyScalar(0.5);
+            
+            // Create planks along a quadratic curve
+            const numPlanks = 10;
+            for(let i=0; i<=numPlanks; i++) {
+                const t = i / numPlanks;
+                
+                // Linear interpolation for X and Z
+                const x = THREE.MathUtils.lerp(posA.x, posB.x, t);
+                const z = THREE.MathUtils.lerp(posA.z, posB.z, t);
+                
+                // Parabola for Y (sagging bridge)
+                // y = 4 * sag * (x - 0.5)^2 + height_offset
+                const sag = 2.0; 
+                const yBase = THREE.MathUtils.lerp(posA.y, posB.y, t);
+                // Simple parabola: -4 * sag * (t - 0.5)^2 + sag
+                // At t=0, y=0. At t=0.5, y=-sag. At t=1, y=0.
+                const ySag = Math.sin(t * Math.PI) * -sag; 
+                
+                // Plank Mesh
+                const plankGeo = new THREE.BoxGeometry(0.8, 0.1, 0.4);
+                const plankMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const plank = new THREE.Mesh(plankGeo, plankMat);
+                
+                plank.position.set(x, yBase + ySag + 1.2, z); // +1.2 to attach to grass level
+                
+                // Rotate plank to face next point
+                plank.lookAt(posB.x, plank.position.y, posB.z);
+                
+                bridge.add(plank);
+            }
+            return bridge;
+        }
+
+        // Connect islands sequentially 0-1-2-3-4-0
+        for (let i = 0; i < islandData.length; i++) {
+            const nextIndex = (i + 1) % islandData.length;
+            const p1 = islandData[i].position;
+            const p2 = islandData[nextIndex].position;
+            const bridge = createBridge(p1, p2);
+            bridgesGroup.add(bridge);
+        }
+
+        // --- 4. INTERACTION LOGIC (Raycaster & GSAP) ---
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredObject = null;
+        let selectedObject = null;
+        let isZoomed = false;
+
+        // Typewriter global vars
+        let typewriterTimeout;
+        const dialogTextEl = document.getElementById('dialog-text');
+        const dialogTitleEl = document.getElementById('dialog-title');
+        const dialogImgEl = document.getElementById('dialog-img');
+        const dialogLinkEl = document.getElementById('dialog-link');
+        const dialogEl = document.getElementById('rpg-dialog');
+        const catcherEl = document.getElementById('click-outside-catcher');
+
+        window.addEventListener('mousemove', (event) => {
+            if(isZoomed) return; 
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(islandsMeshArr);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                
+                if (hoveredObject !== object) {
+                    if (hoveredObject) gsap.to(hoveredObject.parent.position, { y: hoveredObject.parent.userData.baseY, duration: 0.3 });
+                    
+                    hoveredObject = object;
+                    document.body.style.cursor = 'pointer';
+                    
+                    gsap.to(hoveredObject.parent.position, { 
+                        y: hoveredObject.parent.userData.baseY + 1.5, 
+                        duration: 0.4, 
+                        ease: "back.out(1.7)" 
+                    });
+                }
+            } else {
+                if (hoveredObject) {
+                    gsap.to(hoveredObject.parent.position, { y: hoveredObject.parent.userData.baseY, duration: 0.3 });
+                    hoveredObject = null;
+                    document.body.style.cursor = 'default';
+                }
+            }
+        });
+
+        window.addEventListener('click', (event) => {
+            if (isZoomed) return; 
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(islandsMeshArr);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                focusIsland(object);
+            }
+        });
+
+        catcherEl.addEventListener('click', () => {
+            unfocusIsland();
+        });
+
+        function focusIsland(object) {
+            isZoomed = true;
+            selectedObject = object;
+            document.body.style.cursor = 'default';
+
+            // Calculate Target: In front and slightly above
+            const offset = new THREE.Vector3(0, 5, 12); 
+            const islandPos = new THREE.Vector3();
+            object.parent.getWorldPosition(islandPos); 
+
+            // Rotate offset to face center to ensure camera is looking 'inward' or just consistent
+            const angle = Math.atan2(islandPos.z, islandPos.x);
+            offset.applyAxisAngle(new THREE.Vector3(0,1,0), angle); 
+
+            const targetPos = islandPos.clone().add(offset);
+
+            gsap.to(camera.position, {
+                x: targetPos.x,
+                y: targetPos.y,
+                z: targetPos.z,
+                duration: 1.5,
+                ease: "power3.inOut"
+            });
+
+            const currentLookAt = { x: 0, y: 0, z: 0 }; 
+            gsap.to(currentLookAt, {
+                x: islandPos.x,
+                y: islandPos.y + 2, 
+                z: islandPos.z,
+                duration: 1.5,
+                ease: "power3.inOut",
+                onUpdate: () => {
+                    camera.lookAt(currentLookAt.x, currentLookAt.y, currentLookAt.z);
+                },
+                onComplete: () => {
+                    showDialog(object.userData);
+                }
+            });
+
+            document.getElementById('canvas-container').classList.add('blurred');
+        }
+
+        function unfocusIsland() {
+            hideDialog();
+            document.getElementById('canvas-container').classList.remove('blurred');
+
+            // Reset Camera
+            gsap.to(camera.position, {
+                x: INITIAL_CAM_POS.x,
+                y: INITIAL_CAM_POS.y,
+                z: INITIAL_CAM_POS.z,
+                duration: 1.2,
+                ease: "power3.inOut",
+                onComplete: () => {
+                    isZoomed = false;
+                    selectedObject = null;
+                }
+            });
+
+            const tempLookAt = { x: selectedObject.parent.position.x, y: selectedObject.parent.position.y, z: selectedObject.parent.position.z };
+            gsap.to(tempLookAt, {
+                x: 0, 
+                y: 0, 
+                z: 0,
+                duration: 1.2,
+                ease: "power3.inOut",
+                onUpdate: () => {
+                    camera.lookAt(tempLookAt.x, tempLookAt.y, tempLookAt.z);
+                }
+            });
+        }
+
+        // --- 5. UI LOGIC ---
+
+        function showDialog(data) {
+            catcherEl.style.display = 'block';
+            dialogEl.classList.add('active');
+            
+            dialogTitleEl.innerText = data.title;
+            dialogImgEl.src = data.image;
+            dialogLinkEl.href = data.link;
+            dialogTextEl.innerHTML = ''; 
+
+            const text = data.desc;
+            let i = 0;
+            if(typewriterTimeout) clearTimeout(typewriterTimeout);
+
+            function typeWriter() {
+                if (i < text.length) {
+                    dialogTextEl.innerHTML += text.charAt(i);
+                    i++;
+                    typewriterTimeout = setTimeout(typeWriter, Math.random() * 30 + 30);
+                }
+            }
+            typeWriter();
+        }
+
+        function hideDialog() {
+            dialogEl.classList.remove('active');
+            catcherEl.style.display = 'none';
+            if(typewriterTimeout) clearTimeout(typewriterTimeout);
+        }
+
+        // --- 6. ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = clock.getElapsedTime();
+
+            // A. Wave Animation
+            const positions = oceanGeometry.attributes.position;
+            for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const y = positions.getY(i); 
+                const zOffset = Math.sin(x * 0.2 + time) * 0.5 + Math.cos(y * 0.2 + time) * 0.5;
+                positions.setZ(i, zOffset);
+            }
+            positions.needsUpdate = true;
+            ocean.rotation.z = Math.sin(time * 0.05) * 0.02; 
+
+            // B. Island Idle Floating
+            islandsGroup.children.forEach(island => {
+                const isInteracting = (hoveredObject && hoveredObject.parent === island) || (selectedObject && selectedObject.parent === island);
+                if (!isInteracting) {
+                    const offset = island.userData.floatOffset;
+                    // Reduced amplitude to keep bridges looking okay
+                    island.position.y = island.userData.baseY + Math.sin(time * 1.0 + offset) * 0.15;
+                }
+            });
+
+            // C. Landmark Animations
+            animatables.forEach(item => {
+                if(item.userData.blades) {
+                    // Windmill
+                    item.userData.blades.rotation.z -= 0.02;
+                }
+                if(item.userData.crystal) {
+                    // Ruins crystal
+                    item.userData.crystal.rotation.y += 0.01;
+                    item.userData.crystal.position.y = 2 + Math.sin(time * 2) * 0.2;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
