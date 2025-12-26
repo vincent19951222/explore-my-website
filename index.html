@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,16 +8,18 @@
     <!-- 引入像素字体 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: #87CEEB;
             background: linear-gradient(to bottom, #4CA1AF 0%, #C4E0E5 100%);
-            font-family: 'VT323', monospace; /* 全局像素字体 */
-            cursor: none; /* 保持自定义光标 */
+            font-family: 'VT323', monospace;
+            /* 全局像素字体 */
+            cursor: none;
+            /* 保持自定义光标 */
         }
 
         /* --- UI: Loading Screen --- */
@@ -43,7 +46,11 @@
             letter-spacing: 4px;
             margin-bottom: 10px;
         }
-        #loader p { color: #fff; font-size: 1.5rem; }
+
+        #loader p {
+            color: #fff;
+            font-size: 1.5rem;
+        }
 
         /* --- UI: Custom Cursor --- */
         #cursor {
@@ -58,7 +65,7 @@
             transform: translate(-50%, -50%);
             transition: transform 0.1s;
         }
-        
+
         /* --- UI: Helper Text --- */
         #ui-help {
             position: absolute;
@@ -66,7 +73,7 @@
             left: 20px;
             color: #004466;
             font-size: 1.5rem;
-            text-shadow: 2px 2px 0px rgba(255,255,255,0.5);
+            text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.5);
             pointer-events: none;
             user-select: none;
         }
@@ -80,17 +87,20 @@
             width: 600px;
             max-width: 90%;
             height: 180px;
-            background-color: #f4e4bc; /* 羊皮纸色 */
-            border: 4px solid #4a3c31; /* 深褐色边框 */
-            box-shadow: 
-                inset 4px 4px 0px rgba(255,255,255,0.5),
-                inset -4px -4px 0px rgba(0,0,0,0.2),
-                8px 8px 0px rgba(0,0,0,0.3);
+            background-color: #f4e4bc;
+            /* 羊皮纸色 */
+            border: 4px solid #4a3c31;
+            /* 深褐色边框 */
+            box-shadow:
+                inset 4px 4px 0px rgba(255, 255, 255, 0.5),
+                inset -4px -4px 0px rgba(0, 0, 0, 0.2),
+                8px 8px 0px rgba(0, 0, 0, 0.3);
             display: flex;
             padding: 10px;
             font-family: 'VT323', monospace;
             opacity: 0;
-            pointer-events: none; /* 初始不可点击 */
+            pointer-events: none;
+            /* 初始不可点击 */
             transition: opacity 0.3s;
             z-index: 1000;
         }
@@ -111,12 +121,13 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         #ui-avatar {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            image-rendering: pixelated; /* 像素化图片 */
+            image-rendering: pixelated;
+            /* 像素化图片 */
         }
 
         /* 右侧内容区 */
@@ -139,7 +150,8 @@
             font-size: 1.4rem;
             line-height: 1.2;
             margin: 0;
-            min-height: 3.6rem; /* 预留高度 */
+            min-height: 3.6rem;
+            /* 预留高度 */
         }
 
         /* 闪烁的光标/按钮 */
@@ -176,15 +188,57 @@
             line-height: 40px;
             font-size: 1.5rem;
             border: 4px solid #fff;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.3);
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.3);
             cursor: pointer;
-            display: none; /* 只在 active 时显示逻辑 */
+            display: none;
+            /* 只在 active 时显示逻辑 */
         }
-        #game-ui.active #ui-close { display: block; }
+
+        #game-ui.active #ui-close {
+            display: block;
+        }
 
         @keyframes blink {
-            0%, 100% { opacity: 1; transform: translateY(0); }
-            50% { opacity: 0.5; transform: translateY(2px); }
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: translateY(2px);
+            }
+        }
+
+        /* Canvas 背景模糊效果 */
+        canvas {
+            transition: filter 0.8s ease;
+        }
+
+        canvas.blurred {
+            filter: blur(8px) brightness(0.7);
+        }
+
+        /* 打字机光标闪烁 */
+        .typing-cursor::after {
+            content: '▋';
+            animation: cursor-blink 1s step-end infinite;
+            margin-left: 2px;
+            color: #4a3c31;
+        }
+
+        @keyframes cursor-blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
         }
 
         /* 遮罩层，用于点击退出 */
@@ -195,23 +249,87 @@
             width: 100%;
             height: 100%;
             display: none;
-            z-index: 990; /* 在 UI 之下 */
+            z-index: 990;
+            /* 在 UI 之下 */
         }
-        #overlay-mask.active { display: block; }
 
+        #overlay-mask.active {
+            display: block;
+        }
     </style>
 </head>
+
 <body>
+
+    <!-- 3D 标题 -->
+    <div id="title-3d-container">
+        <h1 id="title-3d">动物园里有什么</h1>
+    </div>
+
+    <style>
+        /* 3D 标题容器 */
+        #title-3d-container {
+            position: absolute;
+            top: 40px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+            perspective: 800px;
+        }
+
+        #title-3d {
+            font-family: 'ZCOOL KuaiLe', cursive;
+            font-size: 4rem;
+            font-weight: 400;
+            color: #fff;
+            margin: 0;
+            display: inline-block;
+            /* 3D 效果 */
+            transform: rotateX(15deg) rotateY(0deg);
+            transform-style: preserve-3d;
+            /* 多层文字阴影创建立体感 */
+            text-shadow:
+                0 1px 0 #ccc,
+                0 2px 0 #c9c9c9,
+                0 3px 0 #bbb,
+                0 4px 0 #b9b9b9,
+                0 5px 0 #aaa,
+                0 6px 1px rgba(0, 0, 0, .1),
+                0 0 5px rgba(0, 0, 0, .1),
+                0 1px 3px rgba(0, 0, 0, .3),
+                0 3px 5px rgba(0, 0, 0, .2),
+                0 5px 10px rgba(0, 0, 0, .25),
+                0 10px 10px rgba(0, 0, 0, .2),
+                0 20px 20px rgba(0, 0, 0, .15),
+                4px 4px 0px #2b5876;
+            /* 动画 */
+            animation: title-float 4s ease-in-out infinite;
+        }
+
+        @keyframes title-float {
+
+            0%,
+            100% {
+                transform: rotateX(15deg) rotateY(0deg) translateY(0);
+            }
+
+            50% {
+                transform: rotateX(12deg) rotateY(2deg) translateY(-8px);
+            }
+        }
+    </style>
 
     <!-- Loading -->
     <div id="loader">
-        <h1>BOLUOPETS ARCHIPELAGO</h1>
-        <p>Generating World...</p>
+        <h1>动物园里有什么</h1>
+        <p>正在生成世界...</p>
     </div>
 
     <!-- Cursor -->
     <div id="cursor"></div>
-    
+
     <!-- Help Text -->
     <div id="ui-help">
         <p>⚓ CLICK islands to explore</p>
@@ -253,48 +371,72 @@
             {
                 // Center Island
                 x: 0, z: 0, type: 'lighthouse',
-                name: "Beacon System",
-                description: "A comprehensive design system for React applications. Modular, accessible, and themeable.",
-                cover: "https://placehold.co/150x150/FF6B6B/FFFFFF/png?text=Beacon", 
-                link: "#",
-                themeColor: '#FF6B6B'
+                name: "Merry Christmas",
+                description: "Merry Christmas to you guys, enjoy your life and have fun.",
+                cover: "./images/christmas.png",
+                link: "https://explore.boluopets.com/merry-christmas.html",
+                themeColor: '#FF6B6B',
+                ready: true  // ⏳ 未配置
             },
             {
                 // Left Island
                 x: -14, z: 8, type: 'palm',
                 name: "Coco Adventure",
                 description: "A relaxing web-based farming simulator. Grow coconuts, trade with crabs, and chill.",
-                cover: "https://placehold.co/150x150/4ECDC4/FFFFFF/png?text=Coco", 
+                cover: "https://placehold.co/150x150/4ECDC4/FFFFFF/png?text=Coco",
                 link: "#",
-                themeColor: '#4ECDC4'
+                themeColor: '#4ECDC4',
+                ready: false  // ⏳ 未配置
             },
             {
                 // Right Island
                 x: 14, z: 6, type: 'cabin',
                 name: "Lodge.io SaaS",
                 description: "Booking management platform for remote cabins. Includes calendar and payment integration.",
-                cover: "https://placehold.co/150x150/FFD93D/000000/png?text=Lodge", 
+                cover: "https://placehold.co/150x150/FFD93D/000000/png?text=Lodge",
                 link: "#",
-                themeColor: '#FFD93D'
+                themeColor: '#FFD93D',
+                ready: false  // ⏳ 未配置
             },
             {
                 // Front Island
                 x: 5, z: -14, type: 'windmill',
                 name: "Eco Landing",
                 description: "Award-winning landing page for renewable energy startup. High performance 3D visuals.",
-                cover: "https://placehold.co/150x150/95E1D3/000000/png?text=Eco", 
+                cover: "https://placehold.co/150x150/95E1D3/000000/png?text=Eco",
                 link: "#",
-                themeColor: '#95E1D3'
+                themeColor: '#95E1D3',
+                ready: false  // ⏳ 未配置
+            },
+            {
+                // Back-Left Island (新增)
+                x: -10, z: -12, type: 'ruins',
+                name: "Ancient Archive",
+                description: "A mysterious knowledge base preserving forgotten wisdom. Explore the digital ruins.",
+                cover: "https://placehold.co/150x150/9B59B6/FFFFFF/png?text=Ruins",
+                link: "#",
+                themeColor: '#9B59B6',
+                ready: false  // ⏳ 未配置
+            },
+            {
+                // Far-Right Island (新增)
+                x: 16, z: -8, type: 'palm',
+                name: "Tropical Studio",
+                description: "Creative workspace for designers and artists. Inspiration flows like ocean breeze.",
+                cover: "https://placehold.co/150x150/E67E22/FFFFFF/png?text=Studio",
+                link: "#",
+                themeColor: '#E67E22',
+                ready: false  // ⏳ 未配置
             }
         ];
 
         // --- 2. SCENE SETUP ---
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0xC4E0E5, 40, 150); 
+        scene.fog = new THREE.Fog(0xC4E0E5, 40, 150);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         const initialCamPos = { x: 0, y: 40, z: 70 };
-        camera.position.set(initialCamPos.x, initialCamPos.y, initialCamPos.z); 
+        camera.position.set(initialCamPos.x, initialCamPos.y, initialCamPos.z);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -318,14 +460,14 @@
         document.addEventListener('mousemove', (e) => {
             cursor.style.left = e.clientX + 'px';
             cursor.style.top = e.clientY + 'px';
-            
+
             // FIXED: Correct NDC calculation for Three.js
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1; // +1 is correct for top-left origin
         });
 
         // --- 3. LIGHTING ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         scene.add(ambientLight);
 
         const sunLight = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -337,7 +479,7 @@
         sunLight.shadow.camera.right = 60;
         sunLight.shadow.camera.top = 60;
         sunLight.shadow.camera.bottom = -60;
-        sunLight.shadow.radius = 2; 
+        sunLight.shadow.radius = 2;
         scene.add(sunLight);
 
         // --- 4. OCEAN ---
@@ -365,17 +507,47 @@
         scene.add(water);
 
         // --- 5. TEXTURE & ISLAND GENERATION ---
-        function createInfoTexture(title, description, color) {
+        function createInfoTexture(title, description, color, ready = true) {
             const canvas = document.createElement('canvas');
             canvas.width = 512; canvas.height = 512;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = color; ctx.fillRect(0, 0, 512, 512);
-            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 20; ctx.strokeRect(20, 20, 472, 472);
-            ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.arc(256, 180, 100, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 60px "Courier New"'; ctx.textAlign = 'center';
-            ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 4;
-            ctx.fillText(title.toUpperCase(), 256, 350);
-            ctx.font = '30px "Courier New"'; ctx.fillText(description.substring(0, 20) + "...", 256, 400);
+
+            // 未配置岛屿使用灰色主题
+            const bgColor = ready ? color : '#808080';
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, 512, 512);
+
+            // 边框
+            ctx.strokeStyle = ready ? '#ffffff' : '#555555';
+            ctx.lineWidth = 20;
+            ctx.strokeRect(20, 20, 472, 472);
+
+            // 圈圈装饰
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.beginPath();
+            ctx.arc(256, 180, 100, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 标题文字
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 60px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+            ctx.shadowBlur = 4;
+
+            if (ready) {
+                ctx.fillText(title.toUpperCase(), 256, 350);
+                ctx.font = '30px "Courier New"';
+                ctx.fillText(description.substring(0, 20) + "...", 256, 400);
+            } else {
+                // 未配置岛屿显示 COMING SOON
+                ctx.fillText('COMING', 256, 320);
+                ctx.fillText('SOON', 256, 390);
+                ctx.font = '28px "Courier New"';
+                ctx.fillStyle = '#cccccc';
+                ctx.fillText(title, 256, 440);
+            }
+
             const tex = new THREE.CanvasTexture(canvas);
             tex.colorSpace = THREE.SRGBColorSpace;
             return tex;
@@ -395,10 +567,140 @@
             leaf: new THREE.MeshStandardMaterial({ color: 0x66BB6A })
         };
 
+        // 可动画对象追踪数组
+        const animatables = [];
+
+        // 辅助函数：创建带阴影的盒子
+        function createBox(w, h, d, color, x, y, z) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshStandardMaterial({ color: color, flatShading: true });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            return mesh;
+        }
+
+        // 精细地标：红白条纹灯塔
+        function buildLighthouse() {
+            const group = new THREE.Group();
+            // 红白条纹塔身
+            group.add(createBox(1.5, 1, 1.5, 0xFFFFFF, 0, 0.5, 0));
+            group.add(createBox(1.3, 1, 1.3, 0xD64541, 0, 1.5, 0));
+            group.add(createBox(1.1, 1, 1.1, 0xFFFFFF, 0, 2.5, 0));
+            group.add(createBox(0.9, 1, 0.9, 0xD64541, 0, 3.5, 0));
+            // 顶部发光灯
+            const lampGeo = new THREE.BoxGeometry(1.2, 0.8, 1.2);
+            const lampMat = new THREE.MeshStandardMaterial({ color: 0xFFD93D, emissive: 0xFFD700, emissiveIntensity: 0.5 });
+            const lamp = new THREE.Mesh(lampGeo, lampMat);
+            lamp.position.y = 4.4;
+            group.add(lamp);
+            return group;
+        }
+
+        // 精细地标：弯曲棕榈树
+        function buildPalmTree() {
+            const group = new THREE.Group();
+            // 弯曲树干（通过偏移堆叠模拟）
+            group.add(createBox(0.6, 1.2, 0.6, 0x8B4513, 0, 0.6, 0));
+            group.add(createBox(0.5, 1.2, 0.5, 0x8B4513, 0.2, 1.6, 0));
+            group.add(createBox(0.4, 1.2, 0.4, 0x8B4513, 0.5, 2.6, 0));
+
+            // 6 片旋转树叶
+            const leavesGroup = new THREE.Group();
+            leavesGroup.position.set(0.5, 3.2, 0);
+            const leafGeo = new THREE.BoxGeometry(2.5, 0.2, 0.8);
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
+
+            [0, 60, 120, 180, 240, 300].forEach(deg => {
+                const leaf = new THREE.Mesh(leafGeo, leafMat);
+                leaf.rotation.y = deg * Math.PI / 180;
+                leaf.rotation.z = Math.PI / 6; // 微微下垂
+                leavesGroup.add(leaf);
+            });
+            group.add(leavesGroup);
+            return group;
+        }
+
+        // 精细地标：小木屋
+        function buildCabin() {
+            const group = new THREE.Group();
+            // 木屋主体
+            group.add(createBox(2.2, 1.5, 1.8, 0x8B4513, 0, 0.75, 0));
+            // 门
+            group.add(createBox(0.6, 1, 0.1, 0x4a3c31, 0, 0.5, 0.9));
+            // 棱锥屋顶
+            const roofGeo = new THREE.ConeGeometry(2, 1, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xA0522D, flatShading: true });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.y = 2.0;
+            roof.rotation.y = Math.PI / 4;
+            roof.scale.z = 0.8;
+            group.add(roof);
+            // 烟囱
+            group.add(createBox(0.4, 0.8, 0.4, 0x555555, 0.8, 2.0, -0.4));
+            return group;
+        }
+
+        // 精细地标：风车（带旋转叶片）
+        function buildWindmill() {
+            const group = new THREE.Group();
+            // 风车主体
+            group.add(createBox(1.5, 2, 1.5, 0xEEEEEE, 0, 1, 0));
+            // 橙色屋顶
+            const roofGeo = new THREE.ConeGeometry(1.2, 1, 4);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xD35400 });
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.position.y = 2.5;
+            roof.rotation.y = Math.PI / 4;
+            group.add(roof);
+
+            // 可旋转叶片组
+            const blades = new THREE.Group();
+            blades.position.set(0, 2, 0.8);
+
+            const bladeGeo = new THREE.BoxGeometry(0.3, 3.5, 0.1);
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xF1C40F });
+            const b1 = new THREE.Mesh(bladeGeo, bladeMat);
+            const b2 = new THREE.Mesh(bladeGeo, bladeMat);
+            b2.rotation.z = Math.PI / 2;
+            blades.add(b1);
+            blades.add(b2);
+
+            group.add(blades);
+
+            // 标记为可动画对象
+            group.userData.animatable = true;
+            group.userData.blades = blades;
+
+            return group;
+        }
+
+        // 精细地标：废墟（带漂浮水晶）
+        function buildRuins() {
+            const group = new THREE.Group();
+            // 高低不一的石柱
+            group.add(createBox(0.5, 2.5, 0.5, 0x95A5A6, -0.8, 1.25, -0.8));
+            group.add(createBox(0.5, 1.5, 0.5, 0x95A5A6, 0.8, 0.75, 0.8));
+            group.add(createBox(0.5, 0.5, 0.5, 0x95A5A6, -0.8, 0.25, 0.8)); // 残破的
+            // 漂浮发光水晶
+            const crysGeo = new THREE.OctahedronGeometry(0.4);
+            const crysMat = new THREE.MeshStandardMaterial({ color: 0x9B59B6, emissive: 0x8E44AD, emissiveIntensity: 0.8 });
+            const crystal = new THREE.Mesh(crysGeo, crysMat);
+            crystal.position.set(0, 2, 0);
+
+            // 标记为可动画对象
+            group.userData.animatable = true;
+            group.userData.crystal = crystal;
+            group.add(crystal);
+
+            return group;
+        }
+
         function createIsland(projectData, index) {
             const { x, z, type, name, description, themeColor } = projectData;
             const group = new THREE.Group();
-            
+
             // Attach project data to the 3D object for retrieval on click
             group.userData = {
                 id: index,
@@ -413,49 +715,51 @@
             const sand = new THREE.Mesh(new THREE.BoxGeometry(baseSize, 3, baseSize), materials.sand);
             sand.position.y = -1.5; sand.receiveShadow = true;
             group.add(sand);
-            const grass = new THREE.Mesh(new THREE.BoxGeometry(baseSize - 0.5, 0.6, baseSize - 0.5), materials.grass);
+
+            // 草地颜色：已配置绿色，未配置灰色
+            const grassMat = projectData.ready
+                ? materials.grass
+                : new THREE.MeshLambertMaterial({ color: 0x9E9E9E });
+            const grass = new THREE.Mesh(new THREE.BoxGeometry(baseSize - 0.5, 0.6, baseSize - 0.5), grassMat);
             grass.position.y = 0.3; grass.receiveShadow = true; grass.castShadow = true;
             group.add(grass);
 
             // Billboard
             const boardGroup = new THREE.Group();
-            boardGroup.position.set(2, 2.5, 2); 
+            boardGroup.position.set(2, 2.5, 2);
             boardGroup.rotation.y = -Math.PI / 6;
             const postGeo = new THREE.BoxGeometry(0.2, 3, 0.2);
             const post1 = new THREE.Mesh(postGeo, materials.wood); post1.position.x = -1.5;
             const post2 = new THREE.Mesh(postGeo, materials.wood); post2.position.x = 1.5;
             boardGroup.add(post1, post2);
-            
-            const boardMat = new THREE.MeshStandardMaterial({ 
-                map: createInfoTexture(name, description, themeColor), roughness: 0.6 
+
+            const boardMat = new THREE.MeshStandardMaterial({
+                map: createInfoTexture(name, description, themeColor, projectData.ready), roughness: 0.6
             });
             const board = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.2, 0.2), boardMat);
             board.position.y = 1; board.castShadow = true;
             boardGroup.add(board);
             group.add(boardGroup);
 
-            // Landmark
-            const landmark = new THREE.Group();
+            // Landmark - 使用精细地标函数
+            let landmark;
+            switch (type) {
+                case 'lighthouse': landmark = buildLighthouse(); break;
+                case 'palm': landmark = buildPalmTree(); break;
+                case 'cabin': landmark = buildCabin(); break;
+                case 'windmill': landmark = buildWindmill(); break;
+                case 'ruins': landmark = buildRuins(); break;
+                default: landmark = buildCabin();
+            }
             landmark.position.set(-1.5, 0.6, -1.5);
-            if (type === 'lighthouse') {
-                const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 5, 7), materials.white); tower.position.y = 2.5; tower.castShadow = true; landmark.add(tower);
-                const top = new THREE.Mesh(new THREE.CylinderGeometry(1, 0.8, 1, 7), materials.red); top.position.y = 5; landmark.add(top);
-            } else if (type === 'palm') {
-                for(let i=0; i<6; i++) {
-                    const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.5), materials.wood);
-                    trunk.position.set(Math.sin(i*0.3)*0.5, i*0.7, 0); trunk.rotation.z = -0.1 * i; landmark.add(trunk);
-                }
-                const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 1, 5), materials.leaf); leaves.position.set(1.2, 4, 0); landmark.add(leaves);
-            } else if (type === 'cabin') {
-                const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2, 2.5), materials.wood); cabin.position.y = 1; cabin.castShadow = true; landmark.add(cabin);
-                const roof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1.5, 4), materials.red); roof.position.y = 2.75; roof.rotation.y = Math.PI/4; landmark.add(roof);
-            } else if (type === 'windmill') {
-                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 3, 6), materials.stone); body.position.y = 1.5; body.castShadow = true; landmark.add(body);
-                const blades = new THREE.Group();
-                const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4.5, 0.1), materials.white);
-                const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4.5, 0.1), materials.white); b2.rotation.z = Math.PI/2;
-                blades.add(b1, b2); blades.position.set(0, 3, 0.6);
-                group.userData.blades = blades; landmark.add(blades);
+
+            // 如果地标有动画属性，添加到可动画对象数组
+            if (landmark.userData.animatable) {
+                animatables.push(landmark);
+            }
+            // 风车叶片引用到岛屿 group（保留原有逻辑兼容）
+            if (landmark.userData.blades) {
+                group.userData.blades = landmark.userData.blades;
             }
             group.add(landmark);
 
@@ -479,10 +783,10 @@
                 const dist = start.distanceTo(end);
                 const steps = Math.floor(dist / 0.8);
                 const dir = new THREE.Vector3().subVectors(end, start).normalize();
-                for(let k=2; k<steps-2; k++) {
+                for (let k = 2; k < steps - 2; k++) {
                     const plank = new THREE.Mesh(plankGeo, materials.wood);
                     const pos = new THREE.Vector3().copy(start).add(dir.clone().multiplyScalar(k * 0.8));
-                    const sag = Math.sin((k/steps) * Math.PI) * -1.0;
+                    const sag = Math.sin((k / steps) * Math.PI) * -1.0;
                     plank.position.set(pos.x, 1.0 + sag, pos.z);
                     plank.lookAt(end); plank.castShadow = true;
                     plank.userData.isPlank = true; plank.userData.finalY = plank.position.y; plank.position.y += 800;
@@ -496,15 +800,15 @@
         const cloudGeo = new THREE.BoxGeometry(1, 1, 1);
         const cloudMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.8 });
         const clouds = [];
-        for(let i=0; i<8; i++) {
+        for (let i = 0; i < 8; i++) {
             const cGroup = new THREE.Group();
-            for(let j=0; j<5; j++) {
+            for (let j = 0; j < 5; j++) {
                 const m = new THREE.Mesh(cloudGeo, cloudMat);
-                m.position.set((Math.random()-0.5)*4, (Math.random()-0.5)*1.5, (Math.random()-0.5)*2);
-                m.scale.setScalar(Math.random()*1.5 + 0.5); cGroup.add(m);
+                m.position.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2);
+                m.scale.setScalar(Math.random() * 1.5 + 0.5); cGroup.add(m);
             }
-            cGroup.position.set((Math.random()-0.5)*120, 25+Math.random()*15, (Math.random()-0.5)*80);
-            scene.add(cGroup); clouds.push({ mesh: cGroup, speed: 0.01 + Math.random()*0.02 });
+            cGroup.position.set((Math.random() - 0.5) * 120, 25 + Math.random() * 15, (Math.random() - 0.5) * 80);
+            scene.add(cGroup); clouds.push({ mesh: cGroup, speed: 0.01 + Math.random() * 0.02 });
         }
 
         // --- 6. INTERACTION LOGIC (The RPG System) ---
@@ -559,10 +863,13 @@
         function focusIsland(islandGroup) {
             isExploring = true;
             ui.mask.classList.add('active'); // Enable overlay mask to catch clicks
-            
+
+            // 背景模糊效果
+            renderer.domElement.classList.add('blurred');
+
             // Calculate Camera Target Position
             // We want to look at the island from slightly in front and above
-            const offset = { x: 0, y: 15, z: 25 }; 
+            const offset = { x: 0, y: 15, z: 25 };
             // Add island position
             const targetPos = {
                 x: islandGroup.position.x + offset.x,
@@ -598,6 +905,9 @@
             hideDialog();
             ui.mask.classList.remove('active');
 
+            // 移除背景模糊效果
+            renderer.domElement.classList.remove('blurred');
+
             // 1. Animate Camera back to overview
             gsap.to(camera.position, {
                 x: initialCamPos.x,
@@ -618,24 +928,42 @@
         // UI Logic
         function showDialog(project) {
             ui.container.classList.add('active');
-            
+
             // Set Content
             ui.title.innerText = project.name;
             ui.avatar.src = project.cover;
-            ui.btn.href = project.link;
-            
+
+            // 根据 ready 状态控制按钮
+            if (project.ready) {
+                ui.btn.href = project.link;
+                ui.btn.innerText = '[ OPEN DEMO ] ▶';
+                ui.btn.style.background = '#4a3c31';
+                ui.btn.style.cursor = 'pointer';
+                ui.btn.style.pointerEvents = 'auto';
+            } else {
+                ui.btn.href = '#';
+                ui.btn.innerText = '[ COMING SOON ]';
+                ui.btn.style.background = '#888888';
+                ui.btn.style.cursor = 'not-allowed';
+                ui.btn.style.pointerEvents = 'none';
+            }
+
             // Typewriter Effect
             ui.desc.innerText = "";
-            const text = project.description;
+            ui.desc.classList.add('typing-cursor');
+            const text = project.ready
+                ? project.description
+                : '🚧 ' + project.description + ' (即将上线)';
             let i = 0;
             clearInterval(typeWriterInterval);
-            
+
             typeWriterInterval = setInterval(() => {
                 if (i < text.length) {
                     ui.desc.innerText += text.charAt(i);
                     i++;
                 } else {
                     clearInterval(typeWriterInterval);
+                    ui.desc.classList.remove('typing-cursor'); // 打字完成后移除光标
                 }
             }, 30); // 30ms per char
         }
@@ -670,7 +998,7 @@
 
             // Water
             for (let i = 0; i < waterPos.count; i++) {
-                const x = waterInitPos[i].x; const y = waterInitPos[i].y; 
+                const x = waterInitPos[i].x; const y = waterInitPos[i].y;
                 let z = Math.sin(x * 0.1 + time * 0.8) * Math.cos(y * 0.1 + time * 0.8) * 0.5;
                 z += Math.sin(x * 0.3 - time * 1.5) * 0.3;
                 z += Math.cos(y * 0.5 + time * 2.0) * 0.1;
@@ -690,19 +1018,34 @@
             islands.forEach(obj => {
                 if (obj.userData.isPlank) return;
 
-                // Float physics
+                // Float physics - 增大悬浮幅度
                 if (obj.position.y < 10) {
-                    const floatY = Math.sin(time * obj.userData.floatSpeed + obj.userData.floatOffset) * 0.25;
-                    if(time > 3) obj.position.y = floatY;
+                    const floatY = Math.sin(time * obj.userData.floatSpeed + obj.userData.floatOffset) * 0.4;
+                    if (time > 3) obj.position.y = floatY;
                 }
                 if (obj.userData.blades) obj.userData.blades.rotation.z -= 0.03;
+            });
+
+            // Animatables 动画循环 - 风车旋转 + 水晶漂浮
+            animatables.forEach(item => {
+                if (item.userData.blades) {
+                    item.userData.blades.rotation.z -= 0.02;
+                }
+                if (item.userData.crystal) {
+                    item.userData.crystal.rotation.y += 0.01;
+                    item.userData.crystal.position.y = 2 + Math.sin(time * 2) * 0.2;
+                }
+            });
+
+            islands.forEach(obj => {
+                if (obj.userData.isPlank) return;
 
                 // Hover Logic
                 let isHovered = false;
                 if (!isExploring && intersects.length > 0) {
                     let parent = intersects[0].object;
-                    while(parent) {
-                        if(parent === obj) { isHovered = true; break; }
+                    while (parent) {
+                        if (parent === obj) { isHovered = true; break; }
                         parent = parent.parent;
                     }
                 }
@@ -721,19 +1064,19 @@
                     obj.scale.setScalar(1.0);
                 }
             });
-            
+
             if (!isExploring && intersects.length === 0) {
-                 cursor.style.transform = `translate(-50%, -50%) scale(1)`;
-                 cursor.style.opacity = '0.7';
+                cursor.style.transform = `translate(-50%, -50%) scale(1)`;
+                cursor.style.opacity = '0.7';
             } else if (isExploring) {
-                 cursor.style.opacity = '1'; // Show cursor clearly during UI
-                 cursor.style.transform = `translate(-50%, -50%) scale(1)`;
+                cursor.style.opacity = '1'; // Show cursor clearly during UI
+                cursor.style.transform = `translate(-50%, -50%) scale(1)`;
             }
 
             // Clouds
             clouds.forEach(c => {
                 c.mesh.position.x += c.speed;
-                if(c.mesh.position.x > 100) c.mesh.position.x = -100;
+                if (c.mesh.position.x > 100) c.mesh.position.x = -100;
             });
 
             // Camera Drift (Only when not exploring)
@@ -756,4 +1099,5 @@
         });
     </script>
 </body>
+
 </html>
