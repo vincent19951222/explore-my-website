@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CYBER PETS | 赛博宠物空间</title>
+    <meta name="description" content="赛博朋克风格的宠物展示空间 - 面条、豆包、画卷、窝头" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <style>
+        :root {
+            --background: #0f0f0f;
+            --neon-cyan: #00ffff;
+            --neon-blue: #0080ff;
+            --neon-pink: #ff00ff;
+            --neon-lime: #ccff00;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'VT323', monospace;
+            background: var(--background);
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+
+        .font-pixel {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        .font-terminal {
+            font-family: 'VT323', monospace;
+        }
+
+        /* CRT Overlay */
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .crt-overlay .scanlines {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.1),
+                    rgba(0, 0, 0, 0.1) 1px,
+                    transparent 1px,
+                    transparent 2px);
+        }
+
+        .crt-overlay .vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.5) 100%);
+        }
+
+        /* UI Overlay */
+        .ui-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2rem;
+        }
+
+        .neon-title {
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .neon-title h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            letter-spacing: 0.5em;
+            margin-bottom: 0.5rem;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan);
+        }
+
+        .neon-title .subtitle {
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 0.3em;
+        }
+
+        .neon-title .decorative-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 0.75rem;
+        }
+
+        .neon-title .line {
+            height: 2px;
+            width: 60px;
+            background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+        }
+
+        .neon-title .diamond {
+            width: 8px;
+            height: 8px;
+            background: var(--neon-cyan);
+            transform: rotate(45deg);
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        .hint-text {
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.5);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* Controls hint */
+        .controls-hint {
+            position: fixed;
+            bottom: 2rem;
+            left: 2rem;
+            font-family: 'VT323', monospace;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.4);
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Modal Card */
+        .modal-card {
+            position: relative;
+            width: 340px;
+            background: linear-gradient(180deg, rgba(20, 20, 30, 0.98), rgba(10, 10, 15, 0.98));
+            border: 3px solid;
+            padding: 0;
+            cursor: default;
+            transform: scale(0.5) rotateY(180deg);
+            opacity: 0;
+        }
+
+        .modal-card.cyan {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 30px var(--neon-cyan), 0 0 60px rgba(0, 255, 255, 0.3);
+        }
+
+        .modal-card.blue {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 30px var(--neon-blue), 0 0 60px rgba(0, 128, 255, 0.3);
+        }
+
+        .modal-card.pink {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 30px var(--neon-pink), 0 0 60px rgba(255, 0, 255, 0.3);
+        }
+
+        .modal-card.lime {
+            border-color: var(--neon-lime);
+            box-shadow: 0 0 30px var(--neon-lime), 0 0 60px rgba(204, 255, 0, 0.3);
+        }
+
+        .modal-card .card-inner-border {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 8px;
+            padding: 1rem;
+        }
+
+        .modal-card .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-card .modal-name {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .modal-card .modal-name-en {
+            font-size: 0.6rem;
+            opacity: 0.6;
+            margin-top: 0.25rem;
+        }
+
+        .modal-card .stars {
+            display: flex;
+            gap: 2px;
+        }
+
+        .modal-card .star {
+            font-size: 1rem;
+            color: gold;
+        }
+
+        .modal-card .modal-image-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-card .modal-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: pixelated;
+            filter: contrast(1.1) saturate(1.2);
+        }
+
+        .modal-card .modal-image-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, 0.8) 100%);
+        }
+
+        .modal-card .modal-image-scanlines {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.05),
+                    rgba(0, 0, 0, 0.05) 1px,
+                    transparent 1px,
+                    transparent 2px);
+        }
+
+        .modal-card .modal-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-card .modal-breed {
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
+        .modal-card .modal-type-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            border: 2px solid;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.5rem;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-card.cyan .modal-type-badge {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+        }
+
+        .modal-card.blue .modal-type-badge {
+            border-color: var(--neon-blue);
+            color: var(--neon-blue);
+        }
+
+        .modal-card.pink .modal-type-badge {
+            border-color: var(--neon-pink);
+            color: var(--neon-pink);
+        }
+
+        .modal-card.lime .modal-type-badge {
+            border-color: var(--neon-lime);
+            color: var(--neon-lime);
+        }
+
+        .modal-card .modal-stats {
+            margin-bottom: 1rem;
+        }
+
+        .modal-card .modal-stat-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .modal-card .modal-stat-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .modal-card .modal-stat-name {
+            font-family: 'VT323', monospace;
+            font-size: 1rem;
+            width: 50px;
+        }
+
+        .modal-card .modal-stat-bar {
+            flex: 1;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        .modal-card .modal-stat-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding-left: 4px;
+        }
+
+        .modal-card .modal-stat-fill.cyan {
+            background: linear-gradient(90deg, var(--neon-cyan), rgba(0, 255, 255, 0.5));
+        }
+
+        .modal-card .modal-stat-fill.blue {
+            background: linear-gradient(90deg, var(--neon-blue), rgba(0, 128, 255, 0.5));
+        }
+
+        .modal-card .modal-stat-fill.pink {
+            background: linear-gradient(90deg, var(--neon-pink), rgba(255, 0, 255, 0.5));
+        }
+
+        .modal-card .modal-stat-fill.lime {
+            background: linear-gradient(90deg, var(--neon-lime), rgba(204, 255, 0, 0.5));
+        }
+
+        .modal-card .modal-stat-value {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.5rem;
+            width: 40px;
+            text-align: right;
+        }
+
+        .modal-card .modal-close-hint {
+            text-align: center;
+            font-family: 'VT323', monospace;
+            font-size: 0.9rem;
+            opacity: 0.5;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .text-neon-cyan {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+        }
+
+        .text-neon-blue {
+            color: var(--neon-blue);
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        .text-neon-pink {
+            color: var(--neon-pink);
+            text-shadow: 0 0 5px var(--neon-pink);
+        }
+
+        .text-neon-lime {
+            color: var(--neon-lime);
+            text-shadow: 0 0 5px var(--neon-lime);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Three.js Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- CRT Overlay -->
+    <div class="crt-overlay">
+        <div class="scanlines"></div>
+        <div class="vignette"></div>
+    </div>
+
+    <!-- UI Overlay -->
+    <div class="ui-overlay">
+        <div class="neon-title">
+            <h1>CYBER PETS</h1>
+            <p class="subtitle">赛博宠物空间</p>
+            <div class="decorative-line">
+                <div class="line"></div>
+                <div class="diamond"></div>
+                <div class="line"></div>
+            </div>
+        </div>
+        <p class="hint-text">[ CLICK CARD TO VIEW DETAILS ]</p>
+    </div>
+
+    <!-- Controls Hint -->
+    <div class="controls-hint">
+        🖱️ Drag to rotate | Scroll to zoom
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-card" id="modal-card">
+            <div class="card-inner-border">
+                <div class="modal-header">
+                    <div class="modal-name">
+                        <div id="modal-name-cn">面条</div>
+                        <div class="modal-name-en" id="modal-name-en">Noodle</div>
+                    </div>
+                    <div class="stars" id="modal-stars">
+                        <span class="star">★</span>
+                        <span class="star">★</span>
+                        <span class="star">★</span>
+                        <span class="star">★</span>
+                        <span class="star">★</span>
+                    </div>
+                </div>
+                <div class="modal-image-container">
+                    <img src="" alt="" class="modal-image" id="modal-image">
+                    <div class="modal-image-overlay"></div>
+                    <div class="modal-image-scanlines"></div>
+                </div>
+                <div class="modal-info">
+                    <span class="modal-breed" id="modal-breed">澳洲短毛猫 ♂</span>
+                    <div class="modal-type-badge" id="modal-type-badge">
+                        <span id="modal-type-icon">🟢</span>
+                        <span id="modal-type-label">敏捷型</span>
+                    </div>
+                </div>
+                <div class="modal-stats" id="modal-stats"></div>
+                <div class="modal-close-hint">[ CLICK ANYWHERE TO CLOSE ]</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Pet Data
+        const PETS_DATA = {
+            noodle: {
+                id: 'noodle',
+                nameEn: 'Noodle',
+                nameCn: '面条',
+                breed: '澳洲短毛猫',
+                gender: '♂',
+                typeLabel: '敏捷型',
+                typeIcon: '🟢',
+                color: 'cyan',
+                stats: [
+                    { name: '速度', value: 95 },
+                    { name: '敏捷', value: 88 },
+                    { name: '耐力', value: 60 },
+                ],
+                imageUrl: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400&h=300&fit=crop&crop=face',
+            },
+            doubao: {
+                id: 'doubao',
+                nameEn: 'Doubao',
+                nameCn: '豆包',
+                breed: '银渐层',
+                gender: '♂',
+                typeLabel: '重装型',
+                typeIcon: '🛡️',
+                color: 'blue',
+                stats: [
+                    { name: '防御', value: 92 },
+                    { name: '体力', value: 85 },
+                    { name: '力量', value: 78 },
+                ],
+                imageUrl: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=400&h=300&fit=crop&crop=face',
+            },
+            huajuan: {
+                id: 'huajuan',
+                nameEn: 'Huajuan',
+                nameCn: '画卷',
+                breed: '山猫布偶',
+                gender: '♀',
+                typeLabel: '魔法型',
+                typeIcon: '🔮',
+                color: 'pink',
+                stats: [
+                    { name: '魔力', value: 96 },
+                    { name: '智慧', value: 90 },
+                    { name: '魅力', value: 88 },
+                ],
+                imageUrl: 'https://images.unsplash.com/photo-1495360010541-f48722b34f7d?w=400&h=300&fit=crop&crop=face',
+            },
+            wotou: {
+                id: 'wotou',
+                nameEn: 'Wotou',
+                nameCn: '窝头',
+                breed: '柯基',
+                gender: '♀',
+                typeLabel: '充能型',
+                typeIcon: '⚡',
+                color: 'lime',
+                stats: [
+                    { name: '辅助', value: 94 },
+                    { name: '能量', value: 87 },
+                    { name: '亲和', value: 92 },
+                ],
+                imageUrl: 'https://images.unsplash.com/photo-1612536057832-2ff7ead58194?w=400&h=300&fit=crop&crop=face',
+            },
+        };
+
+        const NEON_COLORS = {
+            cyan: 0x00ffff,
+            blue: 0x0080ff,
+            pink: 0xff00ff,
+            lime: 0xccff00,
+        };
+
+        // 8-bit Sound Generator
+        let audioContext = null;
+        function create8BitSound(type) {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.type = 'square';
+
+            if (type === 'hover') {
+                oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(1760, audioContext.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } else if (type === 'click') {
+                oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(1320, audioContext.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            }
+        }
+
+        // Three.js Scene Setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 8);
+        camera.lookAt(0, 0, 0);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0x222233, 0.5);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        mainLight.position.set(5, 10, 5);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        scene.add(mainLight);
+
+        // Neon Point Lights
+        const cyanLight = new THREE.PointLight(0x00ffff, 2, 15);
+        cyanLight.position.set(-5, 3, 5);
+        scene.add(cyanLight);
+
+        const pinkLight = new THREE.PointLight(0xff00ff, 2, 15);
+        pinkLight.position.set(5, 3, -5);
+        scene.add(pinkLight);
+
+        const blueLight = new THREE.PointLight(0x0080ff, 1.5, 15);
+        blueLight.position.set(0, -2, 5);
+        scene.add(blueLight);
+
+        // Grid Floor
+        const gridHelper = new THREE.GridHelper(20, 40, 0x00ffff, 0x003333);
+        gridHelper.position.y = -2;
+        scene.add(gridHelper);
+
+        // Floating Particles
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particleCount = 500;
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const neonColorArray = [
+            new THREE.Color(0x00ffff),
+            new THREE.Color(0x0080ff),
+            new THREE.Color(0xff00ff),
+            new THREE.Color(0xccff00),
+        ];
+
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 20;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+
+            const color = neonColorArray[Math.floor(Math.random() * neonColorArray.length)];
+            colors[i * 3] = color.r;
+            colors[i * 3 + 1] = color.g;
+            colors[i * 3 + 2] = color.b;
+        }
+
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.05,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8,
+        });
+
+        const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particles);
+
+        // Card Creation
+        const cards = [];
+        const cardMeshes = [];
+        const textureLoader = new THREE.TextureLoader();
+
+        function createCard(petData, position) {
+            const cardGroup = new THREE.Group();
+            cardGroup.userData = { petId: petData.id, isHovered: false };
+
+            // Card dimensions
+            const cardWidth = 1.4;
+            const cardHeight = 2;
+            const cardDepth = 0.08;
+
+            // Main card body with rounded edges effect
+            const cardGeometry = new THREE.BoxGeometry(cardWidth, cardHeight, cardDepth);
+
+            // Create materials for each face
+            const neonColor = NEON_COLORS[petData.color];
+
+            const cardMaterial = new THREE.MeshPhongMaterial({
+                color: 0x1a1a2e,
+                emissive: neonColor,
+                emissiveIntensity: 0.05,
+                shininess: 100,
+                specular: neonColor,
+            });
+
+            const cardMesh = new THREE.Mesh(cardGeometry, cardMaterial);
+            cardMesh.castShadow = true;
+            cardMesh.receiveShadow = true;
+            cardGroup.add(cardMesh);
+
+            // Neon border frame
+            const borderGeometry = new THREE.EdgesGeometry(cardGeometry);
+            const borderMaterial = new THREE.LineBasicMaterial({
+                color: neonColor,
+                linewidth: 2,
+            });
+            const border = new THREE.LineSegments(borderGeometry, borderMaterial);
+            cardGroup.add(border);
+
+            // Glowing outline
+            const glowGeometry = new THREE.BoxGeometry(cardWidth + 0.05, cardHeight + 0.05, cardDepth + 0.02);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: neonColor,
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.BackSide,
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            cardGroup.add(glow);
+            cardGroup.userData.glow = glow;
+            cardGroup.userData.glowMaterial = glowMaterial;
+
+            // Front face with pet image
+            textureLoader.load(petData.imageUrl, (texture) => {
+                texture.minFilter = THREE.NearestFilter;
+                texture.magFilter = THREE.NearestFilter;
+
+                const imageGeometry = new THREE.PlaneGeometry(cardWidth * 0.85, cardWidth * 0.85);
+                const imageMaterial = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true,
+                });
+                const imageMesh = new THREE.Mesh(imageGeometry, imageMaterial);
+                imageMesh.position.z = cardDepth / 2 + 0.001;
+                imageMesh.position.y = 0.25;
+                cardGroup.add(imageMesh);
+
+                // Scanline overlay on image
+                const scanlineCanvas = document.createElement('canvas');
+                scanlineCanvas.width = 128;
+                scanlineCanvas.height = 128;
+                const ctx = scanlineCanvas.getContext('2d');
+                for (let i = 0; i < 128; i += 2) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                    ctx.fillRect(0, i, 128, 1);
+                }
+                const scanlineTexture = new THREE.CanvasTexture(scanlineCanvas);
+                const scanlineMaterial = new THREE.MeshBasicMaterial({
+                    map: scanlineTexture,
+                    transparent: true,
+                    opacity: 0.5,
+                });
+                const scanlineMesh = new THREE.Mesh(imageGeometry, scanlineMaterial);
+                scanlineMesh.position.z = cardDepth / 2 + 0.002;
+                scanlineMesh.position.y = 0.25;
+                cardGroup.add(scanlineMesh);
+            });
+
+            // Create name text using canvas
+            const nameCanvas = document.createElement('canvas');
+            nameCanvas.width = 256;
+            nameCanvas.height = 64;
+            const nameCtx = nameCanvas.getContext('2d');
+            nameCtx.fillStyle = '#000000';
+            nameCtx.fillRect(0, 0, 256, 64);
+            nameCtx.font = 'bold 28px "Press Start 2P", monospace';
+            nameCtx.fillStyle = `#${neonColor.toString(16).padStart(6, '0')}`;
+            nameCtx.textAlign = 'center';
+            nameCtx.fillText(petData.nameCn, 128, 35);
+            nameCtx.font = '14px "VT323", monospace';
+            nameCtx.fillStyle = '#888888';
+            nameCtx.fillText(petData.nameEn, 128, 55);
+
+            const nameTexture = new THREE.CanvasTexture(nameCanvas);
+            nameTexture.minFilter = THREE.NearestFilter;
+            nameTexture.magFilter = THREE.NearestFilter;
+
+            const nameGeometry = new THREE.PlaneGeometry(cardWidth * 0.8, 0.3);
+            const nameMaterial = new THREE.MeshBasicMaterial({
+                map: nameTexture,
+                transparent: true,
+            });
+            const nameMesh = new THREE.Mesh(nameGeometry, nameMaterial);
+            nameMesh.position.z = cardDepth / 2 + 0.001;
+            nameMesh.position.y = -0.55;
+            cardGroup.add(nameMesh);
+
+            // Type badge
+            const badgeCanvas = document.createElement('canvas');
+            badgeCanvas.width = 128;
+            badgeCanvas.height = 32;
+            const badgeCtx = badgeCanvas.getContext('2d');
+            badgeCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            badgeCtx.fillRect(0, 0, 128, 32);
+            badgeCtx.strokeStyle = `#${neonColor.toString(16).padStart(6, '0')}`;
+            badgeCtx.lineWidth = 2;
+            badgeCtx.strokeRect(1, 1, 126, 30);
+            badgeCtx.font = '16px "VT323", monospace';
+            badgeCtx.fillStyle = `#${neonColor.toString(16).padStart(6, '0')}`;
+            badgeCtx.textAlign = 'center';
+            badgeCtx.fillText(`${petData.typeIcon} ${petData.typeLabel}`, 64, 22);
+
+            const badgeTexture = new THREE.CanvasTexture(badgeCanvas);
+            badgeTexture.minFilter = THREE.NearestFilter;
+            badgeTexture.magFilter = THREE.NearestFilter;
+
+            const badgeGeometry = new THREE.PlaneGeometry(0.6, 0.15);
+            const badgeMaterial = new THREE.MeshBasicMaterial({
+                map: badgeTexture,
+                transparent: true,
+            });
+            const badgeMesh = new THREE.Mesh(badgeGeometry, badgeMaterial);
+            badgeMesh.position.z = cardDepth / 2 + 0.001;
+            badgeMesh.position.y = -0.8;
+            cardGroup.add(badgeMesh);
+
+            // Position the card
+            cardGroup.position.copy(position);
+            cardGroup.rotation.y = Math.PI * 0.05;
+
+            scene.add(cardGroup);
+            cards.push(cardGroup);
+            cardMeshes.push(cardMesh);
+
+            return cardGroup;
+        }
+
+        // Create cards in a circular arrangement
+        const petIds = Object.keys(PETS_DATA);
+        const radius = 3;
+        petIds.forEach((petId, index) => {
+            const angle = (index / petIds.length) * Math.PI * 2 - Math.PI / 2;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            const position = new THREE.Vector3(x, 0, z);
+
+            const card = createCard(PETS_DATA[petId], position);
+            // Make cards face outward from center - directly set Y rotation based on angle
+            // Card default faces +Z, to face direction (cos(angle), 0, sin(angle)), rotate by (π/2 - angle)
+            card.rotation.y = Math.PI / 2 - angle;
+        });
+
+        // Raycaster for mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredCard = null;
+
+        // Mouse controls
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let targetRotation = { x: 0, y: 0 };
+        let currentRotation = { x: 0, y: 0 };
+
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            // Update mouse for raycaster
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            if (isDragging) {
+                const deltaMove = {
+                    x: e.clientX - previousMousePosition.x,
+                    y: e.clientY - previousMousePosition.y
+                };
+
+                targetRotation.y += deltaMove.x * 0.005;
+                targetRotation.x += deltaMove.y * 0.003;
+                targetRotation.x = Math.max(-0.5, Math.min(0.5, targetRotation.x));
+
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            }
+        });
+
+        container.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        container.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+        // Zoom controls
+        container.addEventListener('wheel', (e) => {
+            camera.position.z += e.deltaY * 0.01;
+            camera.position.z = Math.max(5, Math.min(15, camera.position.z));
+        });
+
+        // Click handler
+        container.addEventListener('click', (e) => {
+            if (isDragging) return;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cardMeshes);
+
+            if (intersects.length > 0) {
+                const clickedCard = intersects[0].object.parent;
+                const petId = clickedCard.userData.petId;
+                if (petId) {
+                    create8BitSound('click');
+                    openModal(PETS_DATA[petId]);
+                }
+            }
+        });
+
+        // Modal functions
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalCard = document.getElementById('modal-card');
+
+        function openModal(pet) {
+            const colorClass = pet.color;
+            modalCard.className = `modal-card ${colorClass}`;
+
+            document.getElementById('modal-name-cn').textContent = pet.nameCn;
+            document.getElementById('modal-name-cn').className = `text-neon-${colorClass}`;
+            document.getElementById('modal-name-en').textContent = pet.nameEn;
+            document.getElementById('modal-image').src = pet.imageUrl;
+            document.getElementById('modal-image').alt = pet.nameCn;
+            document.getElementById('modal-breed').textContent = `${pet.breed} ${pet.gender}`;
+            document.getElementById('modal-type-icon').textContent = pet.typeIcon;
+            document.getElementById('modal-type-label').textContent = pet.typeLabel;
+
+            // Build stats
+            const statsContainer = document.getElementById('modal-stats');
+            statsContainer.innerHTML = '';
+            pet.stats.forEach(stat => {
+                const row = document.createElement('div');
+                row.className = 'modal-stat-row';
+                row.innerHTML = `
+          <span class="modal-stat-name">${stat.name}</span>
+          <div class="modal-stat-bar">
+            <div class="modal-stat-fill ${colorClass}" style="width: ${stat.value}%"></div>
+          </div>
+          <span class="modal-stat-value text-neon-${colorClass}">${stat.value}</span>
+        `;
+                statsContainer.appendChild(row);
+            });
+
+            modalOverlay.classList.add('active');
+
+            // Animate card in
+            gsap.fromTo(modalCard,
+                { scale: 0.3, rotateY: 180, opacity: 0 },
+                { scale: 1, rotateY: 0, opacity: 1, duration: 0.6, ease: 'back.out(1.7)' }
+            );
+        }
+
+        function closeModal() {
+            gsap.to(modalCard, {
+                scale: 0.3,
+                rotateY: -180,
+                opacity: 0,
+                duration: 0.4,
+                ease: 'back.in(1.7)',
+                onComplete: () => {
+                    modalOverlay.classList.remove('active');
+                }
+            });
+        }
+
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                closeModal();
+            }
+        });
+
+        // Animation loop
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // Smooth camera rotation
+            currentRotation.x += (targetRotation.x - currentRotation.x) * 0.05;
+            currentRotation.y += (targetRotation.y - currentRotation.y) * 0.05;
+
+            // Rotate entire scene based on drag
+            scene.rotation.y = currentRotation.y;
+            camera.position.y = 3 + currentRotation.x * 5;
+            camera.lookAt(0, 0, 0);
+
+            // Animate particles
+            particles.rotation.y += 0.0005;
+            const positions = particles.geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i + 1] += Math.sin(time + i) * 0.001;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            // Animate lights
+            cyanLight.position.x = Math.sin(time * 0.5) * 5;
+            cyanLight.position.z = Math.cos(time * 0.5) * 5;
+            pinkLight.position.x = Math.cos(time * 0.3) * 5;
+            pinkLight.position.z = Math.sin(time * 0.3) * 5;
+
+            // Card hover detection
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cardMeshes);
+
+            cards.forEach(card => {
+                const isHovered = intersects.length > 0 && intersects[0].object.parent === card;
+
+                if (isHovered && !card.userData.isHovered) {
+                    card.userData.isHovered = true;
+                    create8BitSound('hover');
+                    gsap.to(card.position, { y: 0.3, duration: 0.3, ease: 'power2.out' });
+                    gsap.to(card.userData.glowMaterial, { opacity: 0.4, duration: 0.3 });
+                } else if (!isHovered && card.userData.isHovered) {
+                    card.userData.isHovered = false;
+                    gsap.to(card.position, { y: 0, duration: 0.3, ease: 'power2.out' });
+                    gsap.to(card.userData.glowMaterial, { opacity: 0.15, duration: 0.3 });
+                }
+
+                // Subtle floating animation
+                card.position.y += Math.sin(time * 2 + cards.indexOf(card)) * 0.001;
+                card.rotation.z = Math.sin(time + cards.indexOf(card)) * 0.02;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Auto-rotate when not interacting
+        let autoRotateTimeout;
+        function startAutoRotate() {
+            autoRotateTimeout = setInterval(() => {
+                if (!isDragging && !modalOverlay.classList.contains('active')) {
+                    targetRotation.y += 0.002;
+                }
+            }, 16);
+        }
+        startAutoRotate();
+    </script>
+</body>
+
+</html>
